@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0f1117">
+<title>StockFlow Pro</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics-compat.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0f1117;--surface:#1a1d27;--surface2:#22263a;--surface3:#2a2f45;--border:#2e3350;
+  --accent:#4f6ef7;--accent2:#7c3aed;--green:#10b981;--red:#ef4444;--yellow:#f59e0b;--cyan:#06b6d4;
+  --text:#e8eaf6;--text2:#8b90a7;--text3:#555d7a;
+  --r:14px;--r-sm:10px;--nav-h:64px;--top-h:56px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;overflow:hidden;}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;}
+
+/* TOP BAR */
+.top-bar{position:fixed;top:0;left:0;right:0;height:var(--top-h);background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 16px;z-index:300;}
+.top-logo{display:flex;align-items:center;gap:10px;}
+.logo-box{width:32px;height:32px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:16px;}
+.logo-txt{font-size:17px;font-weight:800;letter-spacing:-.4px;}
+.logo-txt span{color:var(--accent);}
+.top-actions{display:flex;gap:6px;}
+.icon-btn{width:38px;height:38px;border-radius:50%;border:none;background:transparent;color:var(--text2);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.icon-btn:active{background:var(--surface2);}
+.has-dot{position:relative;}
+.has-dot::after{content:'';position:absolute;top:7px;right:7px;width:7px;height:7px;background:var(--red);border-radius:50%;border:1.5px solid var(--surface);}
+
+/* SCROLL CONTAINER */
+.scroll-area{position:fixed;top:var(--top-h);left:0;right:0;bottom:var(--nav-h);overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;scroll-behavior:smooth;}
+.page{display:none!important;padding:12px 14px 24px;animation:pgIn .22s ease both;}
+.page.active{display:block!important;}
+@keyframes pgIn{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:none;}}
+
+/* BOTTOM NAV */
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;height:var(--nav-h);background:var(--surface);border-top:1px solid var(--border);display:flex;align-items:stretch;z-index:300;}
+.nav-tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;position:relative;padding:6px 2px 8px;}
+.nav-tab .t-icon{font-size:21px;transition:transform .2s cubic-bezier(.34,1.56,.64,1);}
+.nav-tab .t-lbl{font-size:10px;font-weight:600;color:var(--text3);transition:color .15s;}
+.nav-tab.active .t-icon{transform:scale(1.1);}
+.nav-tab.active .t-lbl{color:var(--accent);}
+.nav-tab.active::before{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:28px;height:3px;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:0 0 3px 3px;}
+.n-badge{position:absolute;top:4px;right:calc(50% - 18px);background:var(--red);color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:10px;display:none;}
+.n-badge.show{display:block;}
+
+/* STAT GRID */
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px;position:relative;overflow:hidden;}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--c1),var(--c2));}
+.sc-b{--c1:#4f6ef7;--c2:#06b6d4;}.sc-g{--c1:#10b981;--c2:#06b6d4;}.sc-r{--c1:#ef4444;--c2:#f59e0b;}.sc-p{--c1:#7c3aed;--c2:#4f6ef7;}
+.sc-icon{font-size:18px;margin-bottom:8px;}.sc-lbl{font-size:10px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px;}
+.sc-val{font-size:26px;font-weight:800;font-family:'JetBrains Mono',monospace;line-height:1;}
+.sc-sub{font-size:10px;color:var(--text2);margin-top:4px;}
+
+/* CHART CARD */
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px;margin-bottom:12px;}
+.ch-title{font-size:13px;font-weight:700;margin-bottom:12px;}
+
+/* LIST ITEMS */
+.list-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:12px;}
+.list-head{padding:12px 14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
+.lh-title{font-size:13px;font-weight:700;}
+.list-item{display:flex;align-items:center;padding:11px 14px;border-bottom:1px solid var(--border);gap:11px;}
+.list-item:last-child{border-bottom:none;}
+.list-item:active{background:var(--surface2);}
+.li-ico{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;}
+.li-body{flex:1;min-width:0;}
+.li-title{font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.li-sub{font-size:11.5px;color:var(--text2);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.li-right{text-align:right;flex-shrink:0;}
+
+/* TX CARD */
+.tx-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px;}
+.tx-dot{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;}
+.tx-body{flex:1;min-width:0;}
+.tx-prod{font-size:13.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.tx-meta{font-size:11.5px;color:var(--text2);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.tx-right{text-align:right;flex-shrink:0;}
+.tx-qty{font-size:15px;font-weight:800;font-family:'JetBrains Mono',monospace;}
+.tx-date{font-size:11px;color:var(--text2);margin-top:2px;}
+
+/* PRODUCT CARD */
+.prod-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);margin-bottom:10px;overflow:hidden;}
+.pc-head{display:flex;align-items:flex-start;justify-content:space-between;padding:12px 14px 10px;}
+.pc-name{font-size:14px;font-weight:700;}
+.pc-cat{font-size:11px;color:var(--text2);margin-top:2px;}
+.pc-actions{display:flex;gap:6px;flex-shrink:0;}
+.pc-variants{border-top:1px solid var(--border);}
+.var-row{display:flex;align-items:center;justify-content:space-between;padding:9px 14px;border-bottom:1px solid var(--border);}
+.var-row:last-child{border-bottom:none;}
+.vr-name{font-size:12.5px;font-weight:600;}.vr-unit{font-size:11px;color:var(--text2);}
+.vr-right{display:flex;align-items:center;gap:7px;}
+.vr-stock{font-size:13px;font-weight:700;font-family:'JetBrains Mono',monospace;}
+
+/* PARTY CARD */
+.party-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px;}
+.pty-ava{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+
+/* SMALL ICON BUTTONS */
+.ibt{width:30px;height:30px;border-radius:8px;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;transition:transform .15s;}
+.ibt:active{transform:scale(.88);}
+.ibt-e{background:rgba(245,158,11,.12);color:var(--yellow);}
+.ibt-d{background:rgba(239,68,68,.12);color:var(--red);}
+.ibt-a{background:rgba(79,110,247,.12);color:var(--accent);}
+
+/* FORM */
+.form-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px;margin-bottom:12px;}
+.fc-title{font-size:14px;font-weight:700;margin-bottom:14px;}
+.field{margin-bottom:12px;}
+.field label{display:block;font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;}
+.field input,.field select{width:100%;padding:13px 14px;background:var(--bg);border:1.5px solid var(--border);border-radius:var(--r-sm);font-size:15px;color:var(--text);font-family:'Inter',sans-serif;outline:none;transition:border .15s;-webkit-appearance:none;appearance:none;}
+.field input:focus,.field select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(79,110,247,.15);}
+.field select option{background:var(--surface2);}
+.field-2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+
+/* TYPE PILLS */
+.type-pills{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;}
+.tp{padding:12px 6px;border-radius:var(--r-sm);border:2px solid var(--border);text-align:center;cursor:pointer;font-size:12px;font-weight:700;background:var(--surface2);color:var(--text2);transition:all .15s;line-height:1.4;}
+.tp:active{transform:scale(.96);}
+.tp.purchase{border-color:var(--green);background:rgba(16,185,129,.12);color:var(--green);}
+.tp.sales{border-color:var(--red);background:rgba(239,68,68,.12);color:var(--red);}
+.tp.return_in{border-color:var(--accent);background:rgba(79,110,247,.12);color:var(--accent);}
+.tp.return_out{border-color:var(--yellow);background:rgba(245,158,11,.12);color:var(--yellow);}
+
+/* STOCK BOX */
+.stock-box{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);padding:12px 14px;margin-bottom:12px;display:flex;align-items:center;gap:12px;}
+.sb-num{font-size:26px;font-weight:800;font-family:'JetBrains Mono',monospace;}
+.sb-lbl{font-size:10px;color:var(--text2);font-weight:700;text-transform:uppercase;letter-spacing:.4px;}
+
+/* SEARCH */
+.search-bar{display:flex;align-items:center;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r-sm);padding:0 12px;margin-bottom:12px;gap:8px;}
+.search-bar input{flex:1;padding:11px 0;background:transparent;border:none;font-size:14px;color:var(--text);font-family:'Inter',sans-serif;outline:none;}
+.s-ico{font-size:15px;color:var(--text3);}
+
+/* FILTER CHIPS */
+.chip-row{display:flex;gap:7px;overflow-x:auto;padding-bottom:4px;margin-bottom:12px;scrollbar-width:none;-webkit-overflow-scrolling:touch;}
+.chip-row::-webkit-scrollbar{display:none;}
+.chip{flex-shrink:0;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;background:var(--surface);border:1.5px solid var(--border);color:var(--text2);cursor:pointer;white-space:nowrap;transition:all .15s;}
+.chip.active{background:rgba(79,110,247,.15);border-color:var(--accent);color:var(--accent);}
+.chip:active{transform:scale(.95);}
+
+/* DATE ROW */
+.date-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;}
+.date-row input{width:100%;padding:9px 12px;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r-sm);font-size:13px;color:var(--text);font-family:'Inter',sans-serif;outline:none;-webkit-appearance:none;}
+.date-row input:focus{border-color:var(--accent);}
+
+/* BADGES */
+.badge{display:inline-flex;align-items:center;padding:2px 9px;border-radius:20px;font-size:10.5px;font-weight:700;}
+.b-purchase{background:rgba(16,185,129,.15);color:var(--green);}
+.b-sales{background:rgba(239,68,68,.15);color:var(--red);}
+.b-return_in{background:rgba(79,110,247,.15);color:var(--accent);}
+.b-return_out{background:rgba(245,158,11,.15);color:var(--yellow);}
+.b-supplier{background:rgba(6,182,212,.15);color:var(--cyan);}
+.b-customer{background:rgba(124,58,237,.15);color:#a78bfa;}
+.b-low{background:rgba(239,68,68,.15);color:var(--red);}
+.b-ok{background:rgba(16,185,129,.15);color:var(--green);}
+
+/* BUTTONS */
+.btn-full{width:100%;padding:14px;border-radius:var(--r-sm);border:none;font-family:'Inter',sans-serif;font-size:15px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:opacity .15s,transform .1s;}
+.btn-full:active{opacity:.85;transform:scale(.98);}
+.btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;}
+.btn-danger{background:rgba(239,68,68,.12);color:var(--red);border:1.5px solid rgba(239,68,68,.25);}
+.btn-ghost{background:var(--surface2);color:var(--text2);border:1.5px solid var(--border);}
+
+/* PDF BTNS */
+.pdf-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;}
+.pdf-btn{padding:12px 8px;border-radius:var(--r-sm);border:none;font-family:'Inter',sans-serif;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:all .15s;}
+.pdf-btn:active{transform:scale(.96);}
+.pdf-tx{background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;}
+.pdf-st{background:linear-gradient(135deg,#7c3aed,#4f6ef7);color:#fff;}
+
+/* FAB */
+.fab{position:fixed;right:16px;bottom:calc(var(--nav-h) + 16px);width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;color:#fff;font-size:24px;cursor:pointer;box-shadow:0 6px 20px rgba(79,110,247,.5);z-index:200;display:flex;align-items:center;justify-content:center;transition:transform .2s cubic-bezier(.34,1.56,.64,1);}
+.fab:active{transform:scale(.9);}
+
+/* BOTTOM SHEET */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:500;backdrop-filter:blur(4px);}
+.overlay.show{display:flex;align-items:flex-end;}
+.sheet{width:100%;background:var(--surface);border-radius:20px 20px 0 0;padding:0 0 28px;animation:shUp .28s cubic-bezier(.16,1,.3,1);max-height:90vh;overflow-y:auto;}
+@keyframes shUp{from{transform:translateY(100%);}to{transform:translateY(0);}}
+.sh-drag{width:36px;height:4px;background:var(--border);border-radius:2px;margin:12px auto 0;}
+.sh-head{padding:14px 18px 8px;display:flex;align-items:center;justify-content:space-between;}
+.sh-head h3{font-size:16px;font-weight:800;}
+.sh-close{width:30px;height:30px;border-radius:50%;border:none;background:var(--surface2);color:var(--text2);font-size:16px;cursor:pointer;}
+.sh-body{padding:8px 18px;}
+
+/* TOAST */
+.toast-wrap{position:fixed;top:calc(var(--top-h)+8px);left:14px;right:14px;z-index:700;pointer-events:none;}
+.toast{background:var(--surface3);border:1px solid var(--border);border-radius:var(--r-sm);padding:12px 14px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:10px;box-shadow:0 8px 24px rgba(0,0,0,.4);animation:tIn .3s ease;margin-bottom:8px;}
+.toast.t-success{border-left:3px solid var(--green);}
+.toast.t-error{border-left:3px solid var(--red);}
+.toast.t-info{border-left:3px solid var(--accent);}
+@keyframes tIn{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:none;}}
+
+/* DIVIDER */
+.divider{font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.8px;margin:16px 0 10px;display:flex;align-items:center;gap:8px;}
+.divider::after{content:'';flex:1;height:1px;background:var(--border);}
+
+/* EMPTY */
+.empty{text-align:center;padding:44px 20px;color:var(--text2);}
+.empty .e-ico{font-size:46px;margin-bottom:12px;}
+.empty p{font-size:14px;font-weight:500;}
+.empty small{font-size:12px;color:var(--text3);margin-top:4px;display:block;}
+
+/* DESKTOP sidebar */
+@media(min-width:768px){
+  html,body{overflow:hidden;}
+  .scroll-area{position:fixed;top:var(--top-h);left:220px;right:0;bottom:0;overflow-y:auto;overflow-x:hidden;}
+  .page{padding:24px 28px 32px;}
+  .page.active{display:block!important;}
+  .bottom-nav,.fab{display:none!important;}
+  .d-sidebar{display:flex!important;position:fixed;top:var(--top-h);left:0;bottom:0;width:220px;background:var(--surface);border-right:1px solid var(--border);flex-direction:column;padding:12px 0;z-index:200;overflow-y:auto;}
+  .d-item{margin:2px 10px;padding:10px 12px;border-radius:var(--r-sm);cursor:pointer;display:flex;align-items:center;gap:10px;font-size:13px;font-weight:500;color:var(--text2);transition:all .15s;}
+  .d-item:hover{background:var(--surface2);color:var(--text);}
+  .d-item.active{background:rgba(79,110,247,.15);color:var(--accent);font-weight:700;}
+  .d-item .d-ico{font-size:16px;width:20px;text-align:center;}
+  .d-bot{margin-top:auto;padding:12px;}
+  .d-sum{background:var(--surface2);border-radius:var(--r-sm);padding:12px;font-size:12px;}
+  .stat-grid{grid-template-columns:repeat(4,1fr);}
+  .type-pills{grid-template-columns:repeat(4,1fr);}
+  .field-2{grid-template-columns:repeat(3,1fr);}
+  .overlay.show{align-items:center;justify-content:center;}
+  .sheet{width:460px;border-radius:var(--r);max-height:80vh;}
+}
+::-webkit-scrollbar{display:none;}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="top-bar">
+  <div class="top-logo">
+    <div class="logo-box">📦</div>
+    <div class="logo-txt">Stock<span>Flow</span></div>
+  </div>
+  <div class="top-actions">
+    <button class="icon-btn has-dot" id="notif-btn" onclick="showPage('history')" title="Alerts">🔔</button>
+    <button class="icon-btn" onclick="exportMenu()" title="Export">⋮</button>
+  </div>
+</div>
+
+<!-- DESKTOP SIDEBAR -->
+<div class="d-sidebar" id="d-sidebar" style="display:none!important;visibility:hidden;">
+  <div class="d-item active" data-p="dashboard"><span class="d-ico">📊</span>Dashboard</div>
+  <div class="d-item" data-p="products"><span class="d-ico">🏷️</span>Products</div>
+  <div class="d-item" data-p="parties"><span class="d-ico">🤝</span>Parties</div>
+  <div class="d-item" data-p="transactions"><span class="d-ico">🔄</span>Transactions</div>
+  <div class="d-item" data-p="history"><span class="d-ico">📋</span>History & Reports</div>
+  <div class="d-bot">
+    <div class="d-sum">
+      <div style="font-size:10px;color:var(--text2);font-weight:700;text-transform:uppercase;letter-spacing:.5px;">Total Stock</div>
+      <div id="ds-total" style="font-size:22px;font-weight:800;font-family:'JetBrains Mono',monospace;margin-top:4px;">0</div>
+      <div id="ds-low" style="font-size:11px;color:var(--red);font-weight:600;margin-top:2px;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- SCROLL AREA -->
+<div class="scroll-area" id="scroll-area">
+
+<!-- ═══ DASHBOARD ═══ -->
+<div class="page active" id="pg-dashboard">
+  <div style="margin-bottom:14px;">
+    <div style="font-size:20px;font-weight:800;">Dashboard 📊</div>
+    <div id="dash-date" style="font-size:12px;color:var(--text2);margin-top:2px;"></div>
+  </div>
+
+  <div class="stat-grid">
+    <div class="stat-card sc-b"><div class="sc-icon">📦</div><div class="sc-lbl">Products</div><div class="sc-val" id="d-prods">0</div><div class="sc-sub" id="d-vars">0 variants</div></div>
+    <div class="stat-card sc-g"><div class="sc-icon">🏗️</div><div class="sc-lbl">Total Stock</div><div class="sc-val" id="d-stock">0</div><div class="sc-sub">units</div></div>
+    <div class="stat-card sc-r"><div class="sc-icon">⚠️</div><div class="sc-lbl">Low Stock</div><div class="sc-val" id="d-low">0</div><div class="sc-sub">need restock</div></div>
+    <div class="stat-card sc-p"><div class="sc-icon">📝</div><div class="sc-lbl">Transactions</div><div class="sc-val" id="d-txn">0</div><div class="sc-sub">all time</div></div>
+  </div>
+
+  <div class="chart-card"><div class="ch-title">📈 Stock by Product</div><div style="height:180px;position:relative;"><canvas id="stockChart"></canvas></div></div>
+  <div class="chart-card"><div class="ch-title">🔄 Transaction Types</div><div style="height:160px;position:relative;"><canvas id="typeChart"></canvas></div></div>
+
+  <div class="divider">⚠️ Low Stock Alerts</div>
+  <div id="low-list"></div>
+
+  <div class="divider">🕒 Recent Activity</div>
+  <div id="recent-list"></div>
+</div>
+
+<!-- ═══ PRODUCTS ═══ -->
+<div class="page" id="pg-products">
+  <div style="margin-bottom:14px;"><div style="font-size:20px;font-weight:800;">Products 🏷️</div><div style="font-size:12px;color:var(--text2);margin-top:2px;">Manage catalog & variants</div></div>
+  <div class="search-bar"><span class="s-ico">🔍</span><input type="text" id="prod-search" placeholder="Search products…" oninput="renderProducts()"></div>
+  <div id="prod-list"></div>
+</div>
+
+<!-- ═══ PARTIES ═══ -->
+<div class="page" id="pg-parties">
+  <div style="margin-bottom:14px;"><div style="font-size:20px;font-weight:800;">Parties 🤝</div><div style="font-size:12px;color:var(--text2);margin-top:2px;">Suppliers & customers</div></div>
+  <div class="search-bar"><span class="s-ico">🔍</span><input type="text" id="party-search" placeholder="Search parties…" oninput="renderParties()"></div>
+  <div id="party-list"></div>
+</div>
+
+<!-- ═══ TRANSACTIONS ═══ -->
+<div class="page" id="pg-transactions">
+  <div style="margin-bottom:14px;"><div style="font-size:20px;font-weight:800;">New Transaction 🔄</div><div style="font-size:12px;color:var(--text2);margin-top:2px;">Record stock movement</div></div>
+
+  <div class="type-pills">
+    <div class="tp" data-v="PURCHASE" onclick="selType('PURCHASE')">📥<br>Purchase</div>
+    <div class="tp" data-v="SALES" onclick="selType('SALES')">📤<br>Sales</div>
+    <div class="tp" data-v="RETURN_IN" onclick="selType('RETURN_IN')">↩️<br>Return In</div>
+    <div class="tp" data-v="RETURN_OUT" onclick="selType('RETURN_OUT')">↪️<br>Return Out</div>
+  </div>
+
+  <div class="form-card">
+    <div class="field"><label>Product</label><select id="trans-prod"><option value="">— Select Product —</option></select></div>
+    <div class="field"><label>Variant / Size</label><select id="trans-var"><option value="">— Select Variant —</option></select></div>
+    <div class="stock-box" id="stock-box">
+      <span style="font-size:22px;">📦</span>
+      <div><div class="sb-lbl">Current Stock</div><div class="sb-num" id="sb-val" style="font-size:15px;color:var(--text2);">Select product &amp; variant</div></div>
+    </div>
+    <div class="field"><label>Party</label><select id="trans-party"><option value="">— Select Party —</option></select></div>
+    <div class="field-2">
+      <div class="field" style="margin-bottom:0;"><label>Quantity</label><input type="number" id="trans-qty" inputmode="decimal" placeholder="0" min="0.01" step="0.01"></div>
+      <div class="field" style="margin-bottom:0;"><label>Date</label><input type="date" id="trans-date"></div>
+    </div>
+    <div class="field" style="margin-top:12px;"><label>Note (optional)</label><input type="text" id="trans-note" placeholder="Remarks…"></div>
+    <div style="margin-top:4px;"><button class="btn-full btn-primary" onclick="submitTx()">✅ Record Transaction</button></div>
+  </div>
+</div>
+
+<!-- ═══ HISTORY ═══ -->
+<div class="page" id="pg-history">
+  <div style="margin-bottom:14px;"><div style="font-size:20px;font-weight:800;">History & Reports 📋</div><div style="font-size:12px;color:var(--text2);margin-top:2px;">Transactions & stock data</div></div>
+
+  <div class="pdf-row">
+    <button class="pdf-btn pdf-tx" onclick="dlTransPDF()">📄 Transactions PDF</button>
+    <button class="pdf-btn pdf-st" onclick="dlStockPDF()">📊 Stock Report PDF</button>
+  </div>
+
+  <div class="search-bar"><span class="s-ico">🔍</span><input type="text" id="hist-search" placeholder="Search product or party…" oninput="renderHistory()"></div>
+
+  <div class="chip-row" id="type-chips">
+    <div class="chip active" data-f="" onclick="setTF(this,'')">All Types</div>
+    <div class="chip" data-f="PURCHASE" onclick="setTF(this,'PURCHASE')">📥 Purchase</div>
+    <div class="chip" data-f="SALES" onclick="setTF(this,'SALES')">📤 Sales</div>
+    <div class="chip" data-f="RETURN_IN" onclick="setTF(this,'RETURN_IN')">↩️ Return In</div>
+    <div class="chip" data-f="RETURN_OUT" onclick="setTF(this,'RETURN_OUT')">↪️ Return Out</div>
+  </div>
+
+  <div class="date-row">
+    <input type="date" id="hist-ds" placeholder="From" onchange="renderHistory()">
+    <input type="date" id="hist-de" placeholder="To" onchange="renderHistory()">
+  </div>
+
+  <div class="chip-row" id="prod-chips"></div>
+
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+    <span style="font-size:12px;color:var(--text2);font-weight:600;" id="hist-count">0 records</span>
+    <button onclick="clearHF()" style="font-size:12px;color:var(--text2);background:none;border:none;padding:4px 8px;cursor:pointer;">✕ Clear</button>
+  </div>
+
+  <div id="hist-list"></div>
+
+  <div class="divider">📦 Stock Report</div>
+  <div class="search-bar"><span class="s-ico">🔍</span><input type="text" id="stock-search" placeholder="Search stock…" oninput="renderStock()"></div>
+  <div id="stock-list"></div>
+</div>
+
+</div><!-- /scroll-area -->
+
+<!-- FAB -->
+<button class="fab" id="fab" onclick="fabAct()">＋</button>
+
+<!-- BOTTOM NAV -->
+<div class="bottom-nav">
+  <div class="nav-tab active" data-p="dashboard" onclick="showPage('dashboard')"><span class="t-icon">📊</span><span class="t-lbl">Home</span></div>
+  <div class="nav-tab" data-p="products" onclick="showPage('products')"><span class="t-icon">🏷️</span><span class="t-lbl">Products</span></div>
+  <div class="nav-tab" data-p="transactions" onclick="showPage('transactions')"><span class="t-icon">🔄</span><span class="t-lbl">Add Stock</span></div>
+  <div class="nav-tab" data-p="parties" onclick="showPage('parties')"><span class="t-icon">🤝</span><span class="t-lbl">Parties</span></div>
+  <div class="nav-tab" data-p="history" onclick="showPage('history')"><span class="t-icon">📋</span><span class="t-lbl">Reports</span><span class="n-badge" id="low-badge">0</span></div>
+</div>
+
+<!-- TOAST -->
+<div class="toast-wrap" id="toast-wrap"></div>
+
+<!-- SHEET OVERLAY -->
+<div class="overlay" id="overlay" onclick="closeSheetOvl(event)">
+  <div class="sheet" id="sheet">
+    <div class="sh-drag"></div>
+    <div class="sh-head"><h3 id="sh-title">Add</h3><button class="sh-close" onclick="closeSheet()">×</button></div>
+    <div class="sh-body" id="sh-body"></div>
+  </div>
+</div>
+
+<script>
+// ══ FIREBASE CONFIG ══
+const firebaseConfig = {
+  apiKey: "AIzaSyDbJ1-AyupHZBZ6EPI-21EOlC_i-JWO00s",
+  authDomain: "stockflow-3e549.firebaseapp.com",
+  databaseURL: "https://stockflow-3e549-default-rtdb.firebaseio.com",
+  projectId: "stockflow-3e549",
+  storageBucket: "stockflow-3e549.firebasestorage.app",
+  messagingSenderId: "625209244392",
+  appId: "1:625209244392:web:a6b7e9f98219a120d0275d",
+  measurementId: "G-YWFXDG66VS"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const DB_REF = db.ref('stockflow');
+
+// ══ STATE ══
+let state={products:[],variants:[],parties:[],transactions:[]};
+let sChart=null,tChart=null,curPage='dashboard',selTxType='PURCHASE';
+let hTF='',hPF='';
+const LOW=5;
+let _fbSaveTimeout=null;
+
+document.addEventListener('DOMContentLoaded',()=>{
+  // Show loading overlay
+  showLoading(true);
+  // Setup Firebase real-time listener
+  DB_REF.on('value', (snapshot)=>{
+    const data = snapshot.val();
+    if(data){
+      state = {
+        products: data.products ? Object.values(data.products) : [],
+        variants: data.variants ? Object.values(data.variants) : [],
+        parties:  data.parties  ? Object.values(data.parties)  : [],
+        transactions: data.transactions ? Object.values(data.transactions) : []
+      };
+    } else {
+      // Try migrating from localStorage on first load
+      try{const s=localStorage.getItem('sf_mob2');if(s){state=JSON.parse(s);saveData();toast('Local data Firebase এ migrate হয়েছে 🎉','success');}}catch(e){}
+    }
+    showLoading(false);
+    renderAll();
+    setupListeners();
+    document.getElementById('trans-date').value=today();
+    document.getElementById('dash-date').textContent=new Date().toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+    selType('PURCHASE');
+  }, (err)=>{
+    showLoading(false);
+    toast('Firebase connection error: '+err.message,'error');
+    // Fallback to localStorage
+    try{const s=localStorage.getItem('sf_mob2');if(s)state=JSON.parse(s);}catch(e){}
+    renderAll();
+    setupListeners();
+    document.getElementById('trans-date').value=today();
+    selType('PURCHASE');
+  });
+
+  if(window.innerWidth>=768){
+    document.getElementById('d-sidebar').style.display='flex';
+    document.querySelectorAll('#d-sidebar .d-item').forEach(it=>it.addEventListener('click',()=>showPage(it.dataset.p)));
+  }
+  window.addEventListener('resize',()=>{
+    const sb=document.getElementById('d-sidebar');
+    if(sb) sb.style.display=window.innerWidth>=768?'flex':'none';
+  });
+});
+
+function showLoading(show){
+  let el=document.getElementById('fb-loading');
+  if(!el){
+    el=document.createElement('div');
+    el.id='fb-loading';
+    el.style.cssText='position:fixed;inset:0;background:rgba(15,17,23,.92);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;';
+    el.innerHTML='<div style="font-size:38px;animation:spin 1s linear infinite">🔄</div><div style="font-size:14px;font-weight:700;color:#e8eaf6;">Firebase থেকে data লোড হচ্ছে…</div>';
+    const style=document.createElement('style');
+    style.textContent='@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}';
+    document.head.appendChild(style);
+    document.body.appendChild(el);
+  }
+  el.style.display=show?'flex':'none';
+}
+
+function today(){return new Date().toISOString().split('T')[0];}
+function gid(){return Date.now().toString(36)+Math.random().toString(36).substr(2,5);}
+function loadData(){/* handled by Firebase listener */}
+function saveData(){
+  // Debounced save to Firebase
+  if(_fbSaveTimeout) clearTimeout(_fbSaveTimeout);
+  _fbSaveTimeout = setTimeout(()=>{
+    const fbData = {
+      products:     state.products.reduce((o,x)=>{o[x.id]=x;return o;},{}),
+      variants:     state.variants.reduce((o,x)=>{o[x.id]=x;return o;},{}),
+      parties:      state.parties.reduce((o,x)=>{o[x.id]=x;return o;},{}),
+      transactions: state.transactions.reduce((o,x)=>{o[x.id]=x;return o;},{})
+    };
+    DB_REF.set(fbData).catch(err=>{
+      toast('Save error: '+err.message,'error');
+      // Fallback save to localStorage
+      localStorage.setItem('sf_mob2',JSON.stringify(state));
+    });
+  }, 400);
+}
+function esc(s){if(!s)return '';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+// ══ NAV ══
+function showPage(p){
+  curPage=p;
+  document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
+  document.getElementById('pg-'+p).classList.add('active');
+  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.toggle('active',t.dataset.p===p));
+  document.querySelectorAll('#d-sidebar .d-item').forEach(t=>t.classList.toggle('active',t.dataset.p===p));
+  document.getElementById('scroll-area').scrollTop=0;
+  const fab=document.getElementById('fab');
+  fab.textContent=p==='transactions'?'✅':'＋';
+  if(p==='dashboard')renderDashboard();
+  if(p==='history'){renderHistory();renderStock();}
+}
+
+// ══ STOCK CALC ══
+function calcStock(pid,vid){
+  return state.transactions.reduce((s,t)=>{
+    if(t.productId!==pid||t.variantId!==vid)return s;
+    if(t.type==='PURCHASE'||t.type==='RETURN_IN')return s+Number(t.qty);
+    if(t.type==='SALES'||t.type==='RETURN_OUT')return s-Number(t.qty);
+    return s;
+  },0);
+}
+function prodTotal(pid){return state.variants.filter(v=>v.productId===pid).reduce((s,v)=>s+calcStock(pid,v.id),0);}
+
+// ══ RENDER ALL ══
+function renderAll(){renderDashboard();renderProducts();renderParties();renderDropdowns();renderHistory();renderStock();updateSidebar();}
+
+function updateSidebar(){
+  let tot=0,low=0;
+  state.variants.forEach(v=>{const s=calcStock(v.productId,v.id);tot+=s;if(s<LOW)low++;});
+  const dt=document.getElementById('ds-total');if(dt)dt.textContent=tot;
+  const dl=document.getElementById('ds-low');if(dl)dl.textContent=low>0?`⚠️ ${low} low stock`:'';
+  const badge=document.getElementById('low-badge');
+  if(badge){badge.textContent=low;badge.classList.toggle('show',low>0);}
+  const notifBtn=document.getElementById('notif-btn');
+  if(notifBtn)notifBtn.classList.toggle('has-dot',low>0);
+}
+
+// ══ DASHBOARD ══
+function renderDashboard(){
+  document.getElementById('d-prods').textContent=state.products.length;
+  document.getElementById('d-vars').textContent=state.variants.length+' variants';
+  document.getElementById('d-txn').textContent=state.transactions.length;
+  let tot=0,low=0;
+  const lbs=[],dt=[],cls=[];
+  const pal=['#4f6ef7','#10b981','#f59e0b','#ef4444','#7c3aed','#06b6d4','#f97316','#84cc16'];
+  state.products.forEach((p,i)=>{const s=prodTotal(p.id);tot+=s;lbs.push(p.name.length>12?p.name.substr(0,12)+'…':p.name);dt.push(s);cls.push(pal[i%pal.length]);});
+  state.variants.forEach(v=>{if(calcStock(v.productId,v.id)<LOW)low++;});
+  document.getElementById('d-stock').textContent=tot;
+  document.getElementById('d-low').textContent=low;
+  updateSidebar();
+  // bar chart
+  if(sChart)sChart.destroy();
+  sChart=new Chart(document.getElementById('stockChart').getContext('2d'),{type:'bar',
+    data:{labels:lbs,datasets:[{label:'Stock',data:dt,backgroundColor:cls,borderRadius:6}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{ticks:{color:'#8b90a7',font:{size:10}},grid:{color:'rgba(255,255,255,.04)'}},
+              y:{beginAtZero:true,ticks:{color:'#8b90a7',font:{size:10}},grid:{color:'rgba(255,255,255,.07)'}}}}});
+  // doughnut
+  const tc={PURCHASE:0,SALES:0,RETURN_IN:0,RETURN_OUT:0};
+  state.transactions.forEach(t=>{if(tc[t.type]!==undefined)tc[t.type]++;});
+  if(tChart)tChart.destroy();
+  tChart=new Chart(document.getElementById('typeChart').getContext('2d'),{type:'doughnut',
+    data:{labels:['Purchase','Sales','Return In','Return Out'],
+      datasets:[{data:[tc.PURCHASE,tc.SALES,tc.RETURN_IN,tc.RETURN_OUT],backgroundColor:['#10b981','#ef4444','#4f6ef7','#f59e0b'],borderWidth:0,hoverOffset:4}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'60%',
+      plugins:{legend:{position:'right',labels:{color:'#8b90a7',font:{size:10},padding:10,boxWidth:10}}}}});
+  // low stock list
+  const ll=document.getElementById('low-list');
+  const lowItems=state.variants.map(v=>({v,prod:state.products.find(p=>p.id===v.productId),s:calcStock(v.productId,v.id)})).filter(x=>x.s<LOW).sort((a,b)=>a.s-b.s);
+  if(!lowItems.length){ll.innerHTML=`<div class="list-card"><div style="text-align:center;padding:18px;color:var(--green);font-size:13px;">✅ All items sufficiently stocked</div></div>`;}
+  else{ll.innerHTML='<div class="list-card">'+lowItems.map(x=>`
+    <div class="list-item">
+      <div class="li-ico" style="background:rgba(239,68,68,.12);">⚠️</div>
+      <div class="li-body"><div class="li-title">${esc(x.prod?.name||'?')}</div><div class="li-sub">${esc(x.v.size)} · ${x.v.unit}</div></div>
+      <div class="li-right"><div style="font-size:14px;font-weight:800;color:var(--red);font-family:'JetBrains Mono',monospace;">${x.s}</div><div style="font-size:10px;color:var(--text2);">remaining</div></div>
+    </div>`).join('')+'</div>';}
+  // recent
+  const rt=document.getElementById('recent-list');
+  const rec=[...state.transactions].sort((a,b)=>b.timestamp-a.timestamp).slice(0,5);
+  if(!rec.length){rt.innerHTML=`<div style="text-align:center;color:var(--text2);padding:20px;font-size:13px;">No transactions yet</div>`;return;}
+  const IC={PURCHASE:{i:'📥',bg:'rgba(16,185,129,.12)'},SALES:{i:'📤',bg:'rgba(239,68,68,.12)'},RETURN_IN:{i:'↩️',bg:'rgba(79,110,247,.12)'},RETURN_OUT:{i:'↪️',bg:'rgba(245,158,11,.12)'}};
+  const QS={PURCHASE:'+',SALES:'−',RETURN_IN:'+',RETURN_OUT:'−'};
+  const QC={PURCHASE:'var(--green)',SALES:'var(--red)',RETURN_IN:'var(--green)',RETURN_OUT:'var(--red)'};
+  rt.innerHTML=rec.map(t=>{
+    const pr=state.products.find(p=>p.id===t.productId);
+    const vr=state.variants.find(v=>v.id===t.variantId);
+    const pa=state.parties.find(p=>p.id===t.partyId);
+    const ic=IC[t.type]||{i:'📦',bg:'var(--surface2)'};
+    return `<div class="tx-card">
+      <div class="tx-dot" style="background:${ic.bg};">${ic.i}</div>
+      <div class="tx-body"><div class="tx-prod">${esc(pr?.name||'?')}</div><div class="tx-meta">${esc(vr?.size||'')} · ${esc(pa?.name||'')}</div></div>
+      <div class="tx-right"><div class="tx-qty" style="color:${QC[t.type]};">${QS[t.type]}${t.qty}</div><div class="tx-date">${t.date}</div></div>
+    </div>`;
+  }).join('');
+}
+
+// ══ PRODUCTS ══
+function renderProducts(){
+  const el=document.getElementById('prod-list');
+  const q=(document.getElementById('prod-search')?.value||'').toLowerCase();
+  const prods=state.products.filter(p=>!q||p.name.toLowerCase().includes(q)||p.category.toLowerCase().includes(q));
+  if(!prods.length){el.innerHTML=`<div class="empty"><div class="e-ico">📦</div><p>No products yet</p><small>Tap ＋ to add your first product</small></div>`;return;}
+  el.innerHTML=prods.map(p=>{
+    const vars=state.variants.filter(v=>v.productId===p.id);
+    const tot=prodTotal(p.id);const isLow=tot<LOW&&vars.length>0;
+    const vHtml=vars.length?vars.map(v=>{
+      const s=calcStock(p.id,v.id);const vl=s<LOW;
+      return `<div class="var-row">
+        <div><div class="vr-name">${esc(v.size)}</div><div class="vr-unit">${v.unit}</div></div>
+        <div class="vr-right">
+          <span class="vr-stock" style="color:${vl?'var(--red)':'var(--green)'};">${s}</span>
+          <button class="ibt ibt-e" onclick="openEditVar('${v.id}')">✏️</button>
+          <button class="ibt ibt-d" onclick="delVar('${v.id}')">✕</button>
+        </div>
+      </div>`;
+    }).join(''):`<div style="padding:10px 14px;font-size:12px;color:var(--text3);">No variants — tap ＋ to add</div>`;
+    return `<div class="prod-card">
+      <div class="pc-head">
+        <div><div class="pc-name">${esc(p.name)}</div><div class="pc-cat">${esc(p.category)} · <span style="color:${isLow?'var(--red)':'var(--green)'};font-weight:700;">${tot} total</span></div></div>
+        <div class="pc-actions">
+          <button class="ibt ibt-a" onclick="openAddVar('${p.id}')" title="Add variant">＋</button>
+          <button class="ibt ibt-e" onclick="openEditProd('${p.id}')">✏️</button>
+          <button class="ibt ibt-d" onclick="delProd('${p.id}')">🗑️</button>
+        </div>
+      </div>
+      <div class="pc-variants">${vHtml}</div>
+    </div>`;
+  }).join('');
+}
+
+// ══ PARTIES ══
+function renderParties(){
+  const el=document.getElementById('party-list');
+  const q=(document.getElementById('party-search')?.value||'').toLowerCase();
+  const list=state.parties.filter(p=>!q||p.name.toLowerCase().includes(q));
+  if(!list.length){el.innerHTML=`<div class="empty"><div class="e-ico">🤝</div><p>No parties yet</p><small>Tap ＋ to add a supplier or customer</small></div>`;return;}
+  el.innerHTML=list.map(p=>{
+    const txC=state.transactions.filter(t=>t.partyId===p.id).length;
+    const sup=p.type==='Supplier';
+    return `<div class="party-card">
+      <div class="pty-ava" style="background:${sup?'rgba(6,182,212,.15)':'rgba(124,58,237,.15)'};">${sup?'🏭':'🛒'}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:14px;font-weight:700;">${esc(p.name)}</div>
+        <div style="font-size:11.5px;color:var(--text2);margin-top:2px;">${esc(p.contact||'No contact')} · ${txC} txn</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span class="badge ${sup?'b-supplier':'b-customer'}">${p.type}</span>
+        <button class="ibt ibt-e" onclick="openEditPty('${p.id}')">✏️</button>
+        <button class="ibt ibt-d" onclick="delPty('${p.id}')">🗑️</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ══ DROPDOWNS ══
+function renderDropdowns(){
+  const pp=document.getElementById('trans-prod');
+  if(pp){const c=pp.value;pp.innerHTML='<option value="">— Select Product —</option>';state.products.forEach(p=>pp.insertAdjacentHTML('beforeend',`<option value="${p.id}">${esc(p.name)}</option>`));pp.value=c;}
+  const tp=document.getElementById('trans-party');
+  if(tp){const c=tp.value;tp.innerHTML='<option value="">— Select Party —</option>';state.parties.forEach(p=>tp.insertAdjacentHTML('beforeend',`<option value="${p.id}">${esc(p.name)} (${p.type})</option>`));tp.value=c;}
+  // prod filter chips
+  const pc=document.getElementById('prod-chips');
+  if(pc)pc.innerHTML='<div class="chip active" onclick="setPF(this,\'\')">All Products</div>'+state.products.map(p=>`<div class="chip" onclick="setPF(this,'${p.id}')">${esc(p.name)}</div>`).join('');
+}
+
+function updateVars(pid){
+  const sel=document.getElementById('trans-var');
+  sel.innerHTML='<option value="">— Select Variant —</option>';
+  state.variants.filter(v=>v.productId===pid).forEach(v=>sel.insertAdjacentHTML('beforeend',`<option value="${v.id}">${esc(v.size)} (${v.unit})</option>`));
+}
+
+function updateSB(){
+  const pid=document.getElementById('trans-prod').value;
+  const vid=document.getElementById('trans-var').value;
+  const el=document.getElementById('sb-val');
+  if(pid&&vid){
+    const s=calcStock(pid,vid);const low=s<LOW;
+    el.innerHTML=`<span style="font-size:26px;font-weight:800;color:${low?'var(--red)':'var(--green)'};">${s}</span> <span style="font-size:12px;color:var(--text2);">${low?'⚠️ Low':'✅ OK'}</span>`;
+    el.style='';
+  } else {
+    el.textContent='Select product & variant';el.style='font-size:15px;color:var(--text2);';
+  }
+}
+
+// ══ TYPE PILLS ══
+function selType(t){
+  selTxType=t;
+  document.querySelectorAll('.tp').forEach(p=>p.className='tp'+(p.dataset.v===t?' '+t.toLowerCase().replace('_',''):''));
+  // re-apply class
+  const map={PURCHASE:'purchase',SALES:'sales',RETURN_IN:'return_in',RETURN_OUT:'return_out'};
+  document.querySelectorAll('.tp').forEach(p=>{if(p.dataset.v===t)p.classList.add(map[t]);});
+}
+
+// ══ TRANSACTION ══
+function submitTx(){
+  const pid=document.getElementById('trans-prod').value;
+  const vid=document.getElementById('trans-var').value;
+  const pty=document.getElementById('trans-party').value;
+  const qty=parseFloat(document.getElementById('trans-qty').value);
+  const date=document.getElementById('trans-date').value;
+  const note=document.getElementById('trans-note').value.trim();
+  if(!pid||!vid||!pty||!date){toast('সব required field পূরণ করুন','error');return;}
+  if(!qty||qty<=0){toast('Quantity অবশ্যই 0 এর বেশি হতে হবে','error');return;}
+  const cur=calcStock(pid,vid);
+  if((selTxType==='SALES'||selTxType==='RETURN_OUT')&&qty>cur){toast(`পর্যাপ্ত স্টক নেই! Available: ${cur}`,'error');return;}
+  state.transactions.push({id:gid(),productId:pid,variantId:vid,partyId:pty,type:selTxType,qty,date,note,timestamp:Date.now()});
+  saveData();renderAll();
+  document.getElementById('trans-qty').value='';
+  document.getElementById('trans-note').value='';
+  updateSB();
+  toast('Transaction সফলভাবে রেকর্ড হয়েছে ✅','success');
+}
+
+// ══ HISTORY ══
+function renderHistory(){
+  const q=(document.getElementById('hist-search')?.value||'').toLowerCase();
+  const ds=document.getElementById('hist-ds')?.value||'';
+  const de=document.getElementById('hist-de')?.value||'';
+  const filtered=state.transactions.filter(t=>{
+    const pr=state.products.find(p=>p.id===t.productId);
+    const pa=state.parties.find(p=>p.id===t.partyId);
+    if(q&&!pr?.name?.toLowerCase().includes(q)&&!pa?.name?.toLowerCase().includes(q))return false;
+    if(hTF&&t.type!==hTF)return false;
+    if(hPF&&t.productId!==hPF)return false;
+    if(ds&&t.date<ds)return false;
+    if(de&&t.date>de)return false;
+    return true;
+  }).sort((a,b)=>b.date.localeCompare(a.date)||b.timestamp-a.timestamp);
+  const cnt=document.getElementById('hist-count');
+  if(cnt)cnt.textContent=`${filtered.length} record${filtered.length!==1?'s':''}`;
+  const el=document.getElementById('hist-list');
+  if(!filtered.length){el.innerHTML=`<div class="empty"><div class="e-ico">📋</div><p>No transactions found</p><small>Try clearing filters</small></div>`;return;}
+  const IC={PURCHASE:{i:'📥',bg:'rgba(16,185,129,.12)'},SALES:{i:'📤',bg:'rgba(239,68,68,.12)'},RETURN_IN:{i:'↩️',bg:'rgba(79,110,247,.12)'},RETURN_OUT:{i:'↪️',bg:'rgba(245,158,11,.12)'}};
+  const QS={PURCHASE:'+',SALES:'−',RETURN_IN:'+',RETURN_OUT:'−'};
+  const QC={PURCHASE:'var(--green)',SALES:'var(--red)',RETURN_IN:'var(--green)',RETURN_OUT:'var(--red)'};
+  el.innerHTML=filtered.map(t=>{
+    const pr=state.products.find(p=>p.id===t.productId);
+    const vr=state.variants.find(v=>v.id===t.variantId);
+    const pa=state.parties.find(p=>p.id===t.partyId);
+    const ic=IC[t.type]||{i:'📦',bg:'var(--surface2)'};
+    return `<div class="tx-card">
+      <div class="tx-dot" style="background:${ic.bg};">${ic.i}</div>
+      <div class="tx-body"><div class="tx-prod">${esc(pr?.name||'Deleted')}</div>
+        <div class="tx-meta">${esc(vr?.size||'')}${vr?' ('+vr.unit+')':''} · ${esc(pa?.name||'Deleted')}${t.note?' · '+esc(t.note):''}</div>
+      </div>
+      <div class="tx-right"><div class="tx-qty" style="color:${QC[t.type]};">${QS[t.type]}${t.qty}</div><div class="tx-date">${t.date}</div></div>
+    </div>`;
+  }).join('');
+}
+
+function setTF(el,ft){hTF=ft;document.querySelectorAll('#type-chips .chip').forEach(c=>c.classList.remove('active'));el.classList.add('active');renderHistory();}
+function setPF(el,pid){hPF=pid;document.querySelectorAll('#prod-chips .chip').forEach(c=>c.classList.remove('active'));el.classList.add('active');renderHistory();}
+function clearHF(){
+  hTF='';hPF='';
+  document.getElementById('hist-search').value='';
+  document.getElementById('hist-ds').value='';
+  document.getElementById('hist-de').value='';
+  document.querySelectorAll('#type-chips .chip').forEach((c,i)=>c.classList.toggle('active',i===0));
+  document.querySelectorAll('#prod-chips .chip').forEach((c,i)=>c.classList.toggle('active',i===0));
+  renderHistory();
+}
+
+// ══ STOCK ══
+function renderStock(){
+  const el=document.getElementById('stock-list');
+  const q=(document.getElementById('stock-search')?.value||'').toLowerCase();
+  const rows=state.variants.map(v=>({v,prod:state.products.find(p=>p.id===v.productId),s:calcStock(v.productId,v.id)}))
+    .filter(x=>!q||x.prod?.name?.toLowerCase().includes(q)||x.v.size.toLowerCase().includes(q))
+    .sort((a,b)=>a.s-b.s);
+  if(!rows.length){el.innerHTML=`<div class="empty"><div class="e-ico">🏗️</div><p>No stock data</p></div>`;return;}
+  el.innerHTML=rows.map(({v,prod,s})=>{
+    const low=s<LOW;
+    return `<div class="tx-card">
+      <div class="tx-dot" style="background:${low?'rgba(239,68,68,.12)':'rgba(16,185,129,.12)'};">${low?'⚠️':'✅'}</div>
+      <div class="tx-body"><div class="tx-prod">${esc(prod?.name||'?')}</div><div class="tx-meta">${esc(v.size)} · ${v.unit} · ${esc(prod?.category||'')}</div></div>
+      <div class="tx-right"><div class="tx-qty" style="color:${low?'var(--red)':'var(--green)'};">${s}</div><div class="tx-date"><span class="badge ${low?'b-low':'b-ok'}">${low?'Low':'OK'}</span></div></div>
+    </div>`;
+  }).join('');
+}
+
+// ══ SHEET ══
+function openSheet(title,html){document.getElementById('sh-title').textContent=title;document.getElementById('sh-body').innerHTML=html;document.getElementById('overlay').classList.add('show');}
+function closeSheet(){document.getElementById('overlay').classList.remove('show');}
+function closeSheetOvl(e){if(e.target===document.getElementById('overlay'))closeSheet();}
+
+// ══ FAB ══
+function fabAct(){
+  if(curPage==='transactions'){submitTx();return;}
+  if(curPage==='products'){openAddProd();return;}
+  if(curPage==='parties'){openAddPty();return;}
+  showPage('transactions');
+}
+
+// ══ EXPORT MENU ══
+function exportMenu(){
+  openSheet('Export Data',`
+    <button class="btn-full" style="background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;margin-bottom:10px;" onclick="closeSheet();dlTransPDF()">📄 Transactions PDF</button>
+    <button class="btn-full" style="background:linear-gradient(135deg,#7c3aed,#4f6ef7);color:#fff;" onclick="closeSheet();dlStockPDF()">📊 Stock Report PDF</button>
+  `);
+}
+
+// ══ PRODUCT SHEETS ══
+function openAddProd(){
+  openSheet('Add Product',`
+    <div class="field"><label>Product Name</label><input id="sp-name" type="text" placeholder="e.g., Royal Basmati Rice"></div>
+    <div class="field"><label>Category</label><input id="sp-cat" type="text" placeholder="e.g., Grains"></div>
+    <button class="btn-full btn-primary" onclick="saveProd(null)" style="margin-top:4px;">➕ Add Product</button>
+  `);
+}
+function openEditProd(id){
+  const p=state.products.find(x=>x.id===id);if(!p)return;
+  openSheet('Edit Product',`
+    <div class="field"><label>Product Name</label><input id="sp-name" type="text" value="${esc(p.name)}"></div>
+    <div class="field"><label>Category</label><input id="sp-cat" type="text" value="${esc(p.category)}"></div>
+    <button class="btn-full btn-primary" onclick="saveProd('${id}')" style="margin-top:4px;">💾 Save Changes</button>
+  `);
+}
+function saveProd(id){
+  const name=document.getElementById('sp-name').value.trim();
+  const cat=document.getElementById('sp-cat').value.trim();
+  if(!name||!cat){toast('Name ও Category দিন','error');return;}
+  if(id){
+    const dup=state.products.find(p=>p.name.toLowerCase()===name.toLowerCase()&&p.id!==id);
+    if(dup){toast('Product name already exists','error');return;}
+    const p=state.products.find(x=>x.id===id);if(p){p.name=name;p.category=cat;}
+  } else {
+    if(state.products.some(p=>p.name.toLowerCase()===name.toLowerCase())){toast('Product name already exists','error');return;}
+    state.products.push({id:gid(),name,category:cat});
+  }
+  saveData();renderAll();closeSheet();toast(id?'Product আপডেট হয়েছে':'Product যোগ হয়েছে','success');
+}
+function delProd(id){
+  if(!confirm('Delete product? All variants & transactions will be removed.'))return;
+  state.variants=state.variants.filter(v=>v.productId!==id);
+  state.transactions=state.transactions.filter(t=>t.productId!==id);
+  state.products=state.products.filter(p=>p.id!==id);
+  saveData();renderAll();toast('Product মুছে গেছে','info');
+}
+
+// ══ VARIANT SHEETS ══
+const UNITS=['pcs','kg','g','ml','L','box','bag','dozen'];
+function unitOpts(sel='pcs'){return UNITS.map(u=>`<option value="${u}"${u===sel?' selected':''}>${u.charAt(0).toUpperCase()+u.slice(1)}</option>`).join('');}
+
+function openAddVar(pid){
+  openSheet('Add Variant',`
+    <div class="field"><label>Size / Variant</label><input id="sv-size" type="text" placeholder="e.g., 1kg, 500g, XL"></div>
+    <div class="field"><label>Unit</label><select id="sv-unit">${unitOpts()}</select></div>
+    <button class="btn-full btn-primary" onclick="saveVar(null,'${pid}')" style="margin-top:4px;">➕ Add Variant</button>
+  `);
+}
+function openEditVar(vid){
+  const v=state.variants.find(x=>x.id===vid);if(!v)return;
+  openSheet('Edit Variant',`
+    <div class="field"><label>Size / Variant</label><input id="sv-size" type="text" value="${esc(v.size)}"></div>
+    <div class="field"><label>Unit</label><select id="sv-unit">${unitOpts(v.unit)}</select></div>
+    <button class="btn-full btn-primary" onclick="saveVar('${vid}',null)" style="margin-top:4px;">💾 Save Changes</button>
+  `);
+}
+function saveVar(vid,pid){
+  const size=document.getElementById('sv-size').value.trim();
+  const unit=document.getElementById('sv-unit').value;
+  if(!size){toast('Size দিন','error');return;}
+  if(vid){const v=state.variants.find(x=>x.id===vid);if(v){v.size=size;v.unit=unit;}}
+  else{state.variants.push({id:gid(),productId:pid,size,unit});}
+  saveData();renderAll();closeSheet();toast(vid?'Variant আপডেট হয়েছে':'Variant যোগ হয়েছে','success');
+}
+function delVar(vid){
+  if(!confirm('Delete this variant?'))return;
+  state.transactions=state.transactions.filter(t=>t.variantId!==vid);
+  state.variants=state.variants.filter(v=>v.id!==vid);
+  saveData();renderAll();toast('Variant মুছে গেছে','info');
+}
+
+// ══ PARTY SHEETS ══
+function openAddPty(){
+  openSheet('Add Party',`
+    <div class="field"><label>Party Name</label><input id="spt-name" type="text" placeholder="Company or person name"></div>
+    <div class="field"><label>Type</label><select id="spt-type"><option value="Supplier">Supplier</option><option value="Customer">Customer</option></select></div>
+    <div class="field"><label>Contact (optional)</label><input id="spt-contact" type="text" placeholder="Phone / Email"></div>
+    <button class="btn-full btn-primary" onclick="savePty(null)" style="margin-top:4px;">➕ Add Party</button>
+  `);
+}
+function openEditPty(id){
+  const p=state.parties.find(x=>x.id===id);if(!p)return;
+  openSheet('Edit Party',`
+    <div class="field"><label>Party Name</label><input id="spt-name" type="text" value="${esc(p.name)}"></div>
+    <div class="field"><label>Type</label><select id="spt-type"><option value="Supplier"${p.type==='Supplier'?' selected':''}>Supplier</option><option value="Customer"${p.type==='Customer'?' selected':''}>Customer</option></select></div>
+    <div class="field"><label>Contact</label><input id="spt-contact" type="text" value="${esc(p.contact||'')}"></div>
+    <button class="btn-full btn-primary" onclick="savePty('${id}')" style="margin-top:4px;">💾 Save Changes</button>
+  `);
+}
+function savePty(id){
+  const name=document.getElementById('spt-name').value.trim();
+  const type=document.getElementById('spt-type').value;
+  const contact=document.getElementById('spt-contact').value.trim();
+  if(!name){toast('Party name দিন','error');return;}
+  if(id){const p=state.parties.find(x=>x.id===id);if(p){p.name=name;p.type=type;p.contact=contact;}}
+  else{state.parties.push({id:gid(),name,type,contact});}
+  saveData();renderAll();closeSheet();toast(id?'Party আপডেট হয়েছে':'Party যোগ হয়েছে','success');
+}
+function delPty(id){
+  if(!confirm('Delete this party?'))return;
+  state.transactions.forEach(t=>{if(t.partyId===id)t.partyId=null;});
+  state.parties=state.parties.filter(p=>p.id!==id);
+  saveData();renderAll();toast('Party মুছে গেছে','info');
+}
+
+// ══ PDF ══
+function dlTransPDF(){
+  const {jsPDF}=window.jspdf;const doc=new jsPDF();
+  const all=[...state.transactions].sort((a,b)=>b.date.localeCompare(a.date)||b.timestamp-a.timestamp);
+  doc.setFillColor(79,110,247);doc.rect(0,0,210,22,'F');
+  doc.setTextColor(255,255,255);doc.setFontSize(13);doc.setFont('helvetica','bold');
+  doc.text('StockFlow Pro — Transaction History',14,14);
+  doc.setTextColor(60,60,60);doc.setFontSize(8.5);doc.setFont('helvetica','normal');
+  doc.text(`Generated: ${new Date().toLocaleString()} | Total: ${all.length} records`,14,29);
+  const rows=all.map(t=>{
+    const pr=state.products.find(p=>p.id===t.productId);
+    const vr=state.variants.find(v=>v.id===t.variantId);
+    const pa=state.parties.find(p=>p.id===t.partyId);
+    return [t.date,t.type.replace('_',' '),pr?.name||'Del',(vr?.size||'')+(vr?' ('+vr.unit+')':''),pa?.name||'Del',t.qty,t.note||''];
+  });
+  doc.autoTable({startY:34,head:[['Date','Type','Product','Variant','Party','Qty','Note']],body:rows,
+    styles:{fontSize:8,cellPadding:2.5},headStyles:{fillColor:[30,30,50],textColor:255,fontStyle:'bold'},
+    alternateRowStyles:{fillColor:[245,247,255]},columnStyles:{5:{halign:'right'}},margin:{left:12,right:12}});
+  doc.save(`stockflow-transactions-${today()}.pdf`);
+  toast('PDF download হচ্ছে…','success');
+}
+
+function dlStockPDF(){
+  const {jsPDF}=window.jspdf;const doc=new jsPDF();
+  doc.setFillColor(124,58,237);doc.rect(0,0,210,22,'F');
+  doc.setTextColor(255,255,255);doc.setFontSize(13);doc.setFont('helvetica','bold');
+  doc.text('StockFlow Pro — Stock Report',14,14);
+  doc.setTextColor(60,60,60);doc.setFontSize(8.5);doc.setFont('helvetica','normal');
+  doc.text(`Generated: ${new Date().toLocaleString()}`,14,29);
+  let tot=0,low=0;
+  state.variants.forEach(v=>{const s=calcStock(v.productId,v.id);tot+=s;if(s<LOW)low++;});
+  doc.text(`Products: ${state.products.length} | Variants: ${state.variants.length} | Total: ${tot} | Low: ${low}`,14,37);
+  const rows=state.variants.map(v=>{
+    const pr=state.products.find(p=>p.id===v.productId);const s=calcStock(v.productId,v.id);
+    return [pr?.name||'?',pr?.category||'',v.size,v.unit,s,s<LOW?'LOW ⚠️':'OK'];
+  }).sort((a,b)=>a[4]-b[4]);
+  doc.autoTable({startY:43,head:[['Product','Category','Variant','Unit','Stock','Status']],body:rows,
+    styles:{fontSize:8.5,cellPadding:3},headStyles:{fillColor:[30,30,50],textColor:255,fontStyle:'bold'},
+    alternateRowStyles:{fillColor:[250,248,255]},columnStyles:{4:{halign:'right'},5:{halign:'center'}},
+    didParseCell:d=>{if(d.section==='body'&&d.column.index===5&&d.cell.raw==='LOW ⚠️'){d.cell.styles.textColor=[220,38,38];d.cell.styles.fontStyle='bold';}},
+    margin:{left:12,right:12}});
+  doc.save(`stockflow-stock-${today()}.pdf`);
+  toast('Stock Report PDF download হচ্ছে…','success');
+}
+
+// ══ LISTENERS ══
+function setupListeners(){
+  document.getElementById('trans-prod').addEventListener('change',e=>{updateVars(e.target.value);document.getElementById('trans-var').value='';updateSB();});
+  document.getElementById('trans-var').addEventListener('change',updateSB);
+}
+
+// ══ TOAST ══
+function toast(msg,type='info'){
+  const icons={success:'✅',error:'❌',info:'ℹ️'};
+  const wrap=document.getElementById('toast-wrap');
+  const el=document.createElement('div');
+  el.className=`toast t-${type}`;
+  el.innerHTML=`<span>${icons[type]}</span><span>${msg}</span>`;
+  wrap.appendChild(el);
+  setTimeout(()=>{el.style.opacity='0';el.style.transform='translateY(-6px)';el.style.transition='all .3s';setTimeout(()=>el.remove(),300);},3000);
+}
+</script>
+</body>
+</html>
