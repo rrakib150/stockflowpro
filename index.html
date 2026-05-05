@@ -8,672 +8,6 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0f1117">
 <title>StockFlow Pro</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js">
-// ══ LOGIN ══
-const PASS='1811192';
-function checkLogin(){
-  const ok=sessionStorage.getItem('sf_auth')==='1';
-  document.getElementById('login-screen').style.display=ok?'none':'flex';
-  document.querySelector('.top-bar').style.display=ok?'flex':'none';
-  document.getElementById('scroll-area').style.display=ok?'block':'none';
-  document.querySelector('.bottom-nav').style.display=ok?'flex':'none';
-  const fab=document.getElementById('fab');if(fab)fab.style.display=ok?'flex':'none';
-  const sb=document.getElementById('d-sidebar');if(sb&&window.innerWidth>=768)sb.style.display=ok?'flex':'none';
-}
-function doLogin(){
-  const pw=document.getElementById('login-pw').value;
-  if(pw===PASS){
-    sessionStorage.setItem('sf_auth','1');
-    checkLogin();
-    toast('স্বাগতম! ✅','success');
-  } else {
-    document.getElementById('login-err').style.display='block';
-    document.getElementById('login-pw').value='';
-    document.getElementById('login-pw').focus();
-  }
-}
-function doLogout(){
-  sessionStorage.removeItem('sf_auth');
-  checkLogin();
-}
-
-// ══ PASSWORD GATE ══
-function pwGate(callback){
-  openSheet('পাসওয়ার্ড নিশ্চিত করুন',`
-    <div style="text-align:center;margin-bottom:16px;font-size:32px;">🔐</div>
-    <div class="field"><label>পাসওয়ার্ড</label>
-      <input id="gate-pw" type="password" placeholder="••••••••" style="font-size:18px;letter-spacing:4px;text-align:center;"
-        onkeydown="if(event.key==='Enter')checkGate()">
-    </div>
-    <div id="gate-err" style="display:none;color:var(--red);font-size:12px;font-weight:600;text-align:center;margin-bottom:10px;">❌ পাসওয়ার্ড ভুল!</div>
-    <button class="btn-full btn-primary" onclick="checkGate()" style="margin-top:4px;">✅ নিশ্চিত করুন</button>
-    <button class="btn-full btn-ghost" onclick="closeSheet()" style="margin-top:8px;">বাতিল</button>
-  `);
-  window._pwGateCallback=callback;
-}
-function checkGate(){
-  const pw=document.getElementById('gate-pw')?.value||'';
-  if(pw===PASS){closeSheet();if(window._pwGateCallback)window._pwGateCallback();}
-  else{const e=document.getElementById('gate-err');if(e)e.style.display='block';document.getElementById('gate-pw').value='';}
-}
-
-// ══ EDIT TRANSACTION ══
-function openEditTx(id){
-  const t=state.transactions.find(x=>x.id===id);if(!t)return;
-  const pr=state.products.find(p=>p.id===t.productId);
-  const vr=state.variants.find(v=>v.id===t.variantId);
-  const pa=state.parties.find(p=>p.id===t.partyId);
-  const typeMap={PURCHASE:'📥 ক্রয়',SALES:'📤 বিক্রয়',RETURN_IN:'↩️ ফেরত আসা',RETURN_OUT:'↪️ ফেরত যাওয়া'};
-  openSheet('লেনদেন সম্পাদনা',`
-    <div style="background:var(--surface2);border-radius:var(--r-sm);padding:11px 13px;margin-bottom:14px;font-size:12.5px;color:var(--text2);">
-      <strong style="color:var(--text);">${esc(pa?.name||'?')}</strong> · ${typeMap[t.type]||t.type}<br>
-      ${esc(pr?.name||'?')} · ${esc(vr?.size||'')} ${vr?.unit||''}
-    </div>
-    <div class="field"><label>তারিখ</label><input id="et-date" type="date" value="${t.date}"></div>
-    <div class="field"><label>পরিমাণ</label><input id="et-qty" type="number" inputmode="decimal" value="${t.qty}" min="0.01" step="0.01"></div>
-    <div class="field"><label>নোট</label><input id="et-note" type="text" value="${esc(t.note||'')}"></div>
-    <div class="field"><label>চালান নং</label><input id="et-inv" type="text" value="${esc(t.invoice||'')}"></div>
-    <div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:var(--r-sm);padding:10px;margin-bottom:14px;font-size:12px;color:var(--yellow);">
-      🔐 মূল্য পরিবর্তনে পাসওয়ার্ড লাগবে
-    </div>
-    <div class="field"><label>একক মূল্য (৳) — পাসওয়ার্ড সংরক্ষিত</label><input id="et-price" type="number" inputmode="decimal" value="${t.price||0}" step="0.01" placeholder="পরিবর্তন করতে পাসওয়ার্ড লাগবে"></div>
-    <button class="btn-full btn-primary" onclick="saveEditTx('${id}')" style="margin-bottom:8px;">💾 সেভ করুন</button>
-    <button class="btn-full btn-ghost" onclick="closeSheet()">বাতিল</button>
-  `);
-}
-
-function saveEditTx(id){
-  const t=state.transactions.find(x=>x.id===id);if(!t)return;
-  const newDate=document.getElementById('et-date').value;
-  const newQty=parseFloat(document.getElementById('et-qty').value);
-  const newNote=document.getElementById('et-note').value.trim();
-  const newInv=document.getElementById('et-inv').value.trim();
-  const newPrice=parseFloat(document.getElementById('et-price').value)||0;
-  if(!newDate||!newQty||newQty<=0){toast('তারিখ ও পরিমাণ দিন','error');return;}
-  const priceChanged=newPrice!==(t.price||0);
-  const doSave=()=>{
-    t.date=newDate;t.qty=newQty;t.note=newNote;t.invoice=newInv;t.price=newPrice;
-    saveData();renderAll();closeSheet();toast('লেনদেন আপডেট হয়েছে ✅','success');
-  };
-  if(priceChanged){pwGate(doSave);}else{doSave();}
-}
-
-// ══ RESET FINANCIAL ══
-function resetFinancial(){
-  pwGate(()=>{
-    openSheet('আর্থিক রিসেট নিশ্চিত করুন',`
-      <div style="text-align:center;padding:12px 0 16px;">
-        <div style="font-size:44px;margin-bottom:12px;">⚠️</div>
-        <div style="font-size:14px;font-weight:700;margin-bottom:8px;">আর্থিক তথ্য শূন্য করবেন?</div>
-        <div style="font-size:12.5px;color:var(--text2);line-height:1.6;">সব লেনদেন ও পেমেন্ট মুছে যাবে।<br>পণ্য ও পার্টি থাকবে।<br><strong style="color:var(--red);">এই কাজ পূর্বাবস্থায় ফেরানো যাবে না।</strong></div>
-      </div>
-      <button class="btn-full btn-danger" style="margin-bottom:8px;" onclick="doResetFinancial()">✅ হ্যাঁ, শূন্য করুন</button>
-      <button class="btn-full btn-ghost" onclick="closeSheet()">বাতিল</button>
-    `);
-  });
-}
-function doResetFinancial(){
-  state.transactions=[];state.payments=[];
-  saveData();renderAll();closeSheet();
-  toast('আর্থিক ডেটা শূন্য করা হয়েছে','info');
-}
-
-</script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js">
-// ══ LOGIN ══
-const PASS='1811192';
-function checkLogin(){
-  const ok=sessionStorage.getItem('sf_auth')==='1';
-  document.getElementById('login-screen').style.display=ok?'none':'flex';
-  document.querySelector('.top-bar').style.display=ok?'flex':'none';
-  document.getElementById('scroll-area').style.display=ok?'block':'none';
-  document.querySelector('.bottom-nav').style.display=ok?'flex':'none';
-  const fab=document.getElementById('fab');if(fab)fab.style.display=ok?'flex':'none';
-  const sb=document.getElementById('d-sidebar');if(sb&&window.innerWidth>=768)sb.style.display=ok?'flex':'none';
-}
-function doLogin(){
-  const pw=document.getElementById('login-pw').value;
-  if(pw===PASS){
-    sessionStorage.setItem('sf_auth','1');
-    checkLogin();
-    toast('স্বাগতম! ✅','success');
-  } else {
-    document.getElementById('login-err').style.display='block';
-    document.getElementById('login-pw').value='';
-    document.getElementById('login-pw').focus();
-  }
-}
-function doLogout(){
-  sessionStorage.removeItem('sf_auth');
-  checkLogin();
-}
-
-// ══ PASSWORD GATE ══
-function pwGate(callback){
-  openSheet('পাসওয়ার্ড নিশ্চিত করুন',`
-    <div style="text-align:center;margin-bottom:16px;font-size:32px;">🔐</div>
-    <div class="field"><label>পাসওয়ার্ড</label>
-      <input id="gate-pw" type="password" placeholder="••••••••" style="font-size:18px;letter-spacing:4px;text-align:center;"
-        onkeydown="if(event.key==='Enter')checkGate()">
-    </div>
-    <div id="gate-err" style="display:none;color:var(--red);font-size:12px;font-weight:600;text-align:center;margin-bottom:10px;">❌ পাসওয়ার্ড ভুল!</div>
-    <button class="btn-full btn-primary" onclick="checkGate()" style="margin-top:4px;">✅ নিশ্চিত করুন</button>
-    <button class="btn-full btn-ghost" onclick="closeSheet()" style="margin-top:8px;">বাতিল</button>
-  `);
-  window._pwGateCallback=callback;
-}
-function checkGate(){
-  const pw=document.getElementById('gate-pw')?.value||'';
-  if(pw===PASS){closeSheet();if(window._pwGateCallback)window._pwGateCallback();}
-  else{const e=document.getElementById('gate-err');if(e)e.style.display='block';document.getElementById('gate-pw').value='';}
-}
-
-// ══ EDIT TRANSACTION ══
-function openEditTx(id){
-  const t=state.transactions.find(x=>x.id===id);if(!t)return;
-  const pr=state.products.find(p=>p.id===t.productId);
-  const vr=state.variants.find(v=>v.id===t.variantId);
-  const pa=state.parties.find(p=>p.id===t.partyId);
-  const typeMap={PURCHASE:'📥 ক্রয়',SALES:'📤 বিক্রয়',RETURN_IN:'↩️ ফেরত আসা',RETURN_OUT:'↪️ ফেরত যাওয়া'};
-  openSheet('লেনদেন সম্পাদনা',`
-    <div style="background:var(--surface2);border-radius:var(--r-sm);padding:11px 13px;margin-bottom:14px;font-size:12.5px;color:var(--text2);">
-      <strong style="color:var(--text);">${esc(pa?.name||'?')}</strong> · ${typeMap[t.type]||t.type}<br>
-      ${esc(pr?.name||'?')} · ${esc(vr?.size||'')} ${vr?.unit||''}
-    </div>
-    <div class="field"><label>তারিখ</label><input id="et-date" type="date" value="${t.date}"></div>
-    <div class="field"><label>পরিমাণ</label><input id="et-qty" type="number" inputmode="decimal" value="${t.qty}" min="0.01" step="0.01"></div>
-    <div class="field"><label>নোট</label><input id="et-note" type="text" value="${esc(t.note||'')}"></div>
-    <div class="field"><label>চালান নং</label><input id="et-inv" type="text" value="${esc(t.invoice||'')}"></div>
-    <div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:var(--r-sm);padding:10px;margin-bottom:14px;font-size:12px;color:var(--yellow);">
-      🔐 মূল্য পরিবর্তনে পাসওয়ার্ড লাগবে
-    </div>
-    <div class="field"><label>একক মূল্য (৳) — পাসওয়ার্ড সংরক্ষিত</label><input id="et-price" type="number" inputmode="decimal" value="${t.price||0}" step="0.01" placeholder="পরিবর্তন করতে পাসওয়ার্ড লাগবে"></div>
-    <button class="btn-full btn-primary" onclick="saveEditTx('${id}')" style="margin-bottom:8px;">💾 সেভ করুন</button>
-    <button class="btn-full btn-ghost" onclick="closeSheet()">বাতিল</button>
-  `);
-}
-
-function saveEditTx(id){
-  const t=state.transactions.find(x=>x.id===id);if(!t)return;
-  const newDate=document.getElementById('et-date').value;
-  const newQty=parseFloat(document.getElementById('et-qty').value);
-  const newNote=document.getElementById('et-note').value.trim();
-  const newInv=document.getElementById('et-inv').value.trim();
-  const newPrice=parseFloat(document.getElementById('et-price').value)||0;
-  if(!newDate||!newQty||newQty<=0){toast('তারিখ ও পরিমাণ দিন','error');return;}
-  const priceChanged=newPrice!==(t.price||0);
-  const doSave=()=>{
-    t.date=newDate;t.qty=newQty;t.note=newNote;t.invoice=newInv;t.price=newPrice;
-    saveData();renderAll();closeSheet();toast('লেনদেন আপডেট হয়েছে ✅','success');
-  };
-  if(priceChanged){pwGate(doSave);}else{doSave();}
-}
-
-// ══ RESET FINANCIAL ══
-function resetFinancial(){
-  pwGate(()=>{
-    openSheet('আর্থিক রিসেট নিশ্চিত করুন',`
-      <div style="text-align:center;padding:12px 0 16px;">
-        <div style="font-size:44px;margin-bottom:12px;">⚠️</div>
-        <div style="font-size:14px;font-weight:700;margin-bottom:8px;">আর্থিক তথ্য শূন্য করবেন?</div>
-        <div style="font-size:12.5px;color:var(--text2);line-height:1.6;">সব লেনদেন ও পেমেন্ট মুছে যাবে।<br>পণ্য ও পার্টি থাকবে।<br><strong style="color:var(--red);">এই কাজ পূর্বাবস্থায় ফেরানো যাবে না।</strong></div>
-      </div>
-      <button class="btn-full btn-danger" style="margin-bottom:8px;" onclick="doResetFinancial()">✅ হ্যাঁ, শূন্য করুন</button>
-      <button class="btn-full btn-ghost" onclick="closeSheet()">বাতিল</button>
-    `);
-  });
-}
-function doResetFinancial(){
-  state.transactions=[];state.payments=[];
-  saveData();renderAll();closeSheet();
-  toast('আর্থিক ডেটা শূন্য করা হয়েছে','info');
-}
-
-</script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js">
-// ══ LOGIN ══
-const PASS='1811192';
-function checkLogin(){
-  const ok=sessionStorage.getItem('sf_auth')==='1';
-  document.getElementById('login-screen').style.display=ok?'none':'flex';
-  document.querySelector('.top-bar').style.display=ok?'flex':'none';
-  document.getElementById('scroll-area').style.display=ok?'block':'none';
-  document.querySelector('.bottom-nav').style.display=ok?'flex':'none';
-  const fab=document.getElementById('fab');if(fab)fab.style.display=ok?'flex':'none';
-  const sb=document.getElementById('d-sidebar');if(sb&&window.innerWidth>=768)sb.style.display=ok?'flex':'none';
-}
-function doLogin(){
-  const pw=document.getElementById('login-pw').value;
-  if(pw===PASS){
-    sessionStorage.setItem('sf_auth','1');
-    checkLogin();
-    toast('স্বাগতম! ✅','success');
-  } else {
-    document.getElementById('login-err').style.display='block';
-    document.getElementById('login-pw').value='';
-    document.getElementById('login-pw').focus();
-  }
-}
-function doLogout(){
-  sessionStorage.removeItem('sf_auth');
-  checkLogin();
-}
-
-// ══ PASSWORD GATE ══
-function pwGate(callback){
-  openSheet('পাসওয়ার্ড নিশ্চিত করুন',`
-    <div style="text-align:center;margin-bottom:16px;font-size:32px;">🔐</div>
-    <div class="field"><label>পাসওয়ার্ড</label>
-      <input id="gate-pw" type="password" placeholder="••••••••" style="font-size:18px;letter-spacing:4px;text-align:center;"
-        onkeydown="if(event.key==='Enter')checkGate()">
-    </div>
-    <div id="gate-err" style="display:none;color:var(--red);font-size:12px;font-weight:600;text-align:center;margin-bottom:10px;">❌ পাসওয়ার্ড ভুল!</div>
-    <button class="btn-full btn-primary" onclick="checkGate()" style="margin-top:4px;">✅ নিশ্চিত করুন</button>
-    <button class="btn-full btn-ghost" onclick="closeSheet()" style="margin-top:8px;">বাতিল</button>
-  `);
-  window._pwGateCallback=callback;
-}
-function checkGate(){
-  const pw=document.getElementById('gate-pw')?.value||'';
-  if(pw===PASS){closeSheet();if(window._pwGateCallback)window._pwGateCallback();}
-  else{const e=document.getElementById('gate-err');if(e)e.style.display='block';document.getElementById('gate-pw').value='';}
-}
-
-// ══ EDIT TRANSACTION ══
-function openEditTx(id){
-  const t=state.transactions.find(x=>x.id===id);if(!t)return;
-  const pr=state.products.find(p=>p.id===t.productId);
-  const vr=state.variants.find(v=>v.id===t.variantId);
-  const pa=state.parties.find(p=>p.id===t.partyId);
-  const typeMap={PURCHASE:'📥 ক্রয়',SALES:'📤 বিক্রয়',RETURN_IN:'↩️ ফেরত আসা',RETURN_OUT:'↪️ ফেরত যাওয়া'};
-  openSheet('লেনদেন সম্পাদনা',`
-    <div style="background:var(--surface2);border-radius:var(--r-sm);padding:11px 13px;margin-bottom:14px;font-size:12.5px;color:var(--text2);">
-      <strong style="color:var(--text);">${esc(pa?.name||'?')}</strong> · ${typeMap[t.type]||t.type}<br>
-      ${esc(pr?.name||'?')} · ${esc(vr?.size||'')} ${vr?.unit||''}
-    </div>
-    <div class="field"><label>তারিখ</label><input id="et-date" type="date" value="${t.date}"></div>
-    <div class="field"><label>পরিমাণ</label><input id="et-qty" type="number" inputmode="decimal" value="${t.qty}" min="0.01" step="0.01"></div>
-    <div class="field"><label>নোট</label><input id="et-note" type="text" value="${esc(t.note||'')}"></div>
-    <div class="field"><label>চালান নং</label><input id="et-inv" type="text" value="${esc(t.invoice||'')}"></div>
-    <div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:var(--r-sm);padding:10px;margin-bottom:14px;font-size:12px;color:var(--yellow);">
-      🔐 মূল্য পরিবর্তনে পাসওয়ার্ড লাগবে
-    </div>
-    <div class="field"><label>একক মূল্য (৳) — পাসওয়ার্ড সংরক্ষিত</label><input id="et-price" type="number" inputmode="decimal" value="${t.price||0}" step="0.01" placeholder="পরিবর্তন করতে পাসওয়ার্ড লাগবে"></div>
-    <button class="btn-full btn-primary" onclick="saveEditTx('${id}')" style="margin-bottom:8px;">💾 সেভ করুন</button>
-    <button class="btn-full btn-ghost" onclick="closeSheet()">বাতিল</button>
-  `);
-}
-
-function saveEditTx(id){
-  const t=state.transactions.find(x=>x.id===id);if(!t)return;
-  const newDate=document.getElementById('et-date').value;
-  const newQty=parseFloat(document.getElementById('et-qty').value);
-  const newNote=document.getElementById('et-note').value.trim();
-  const newInv=document.getElementById('et-inv').value.trim();
-  const newPrice=parseFloat(document.getElementById('et-price').value)||0;
-  if(!newDate||!newQty||newQty<=0){toast('তারিখ ও পরিমাণ দিন','error');return;}
-  const priceChanged=newPrice!==(t.price||0);
-  const doSave=()=>{
-    t.date=newDate;t.qty=newQty;t.note=newNote;t.invoice=newInv;t.price=newPrice;
-    saveData();renderAll();closeSheet();toast('লেনদেন আপডেট হয়েছে ✅','success');
-  };
-  if(priceChanged){pwGate(doSave);}else{doSave();}
-}
-
-// ══ RESET FINANCIAL ══
-function resetFinancial(){
-  pwGate(()=>{
-    openSheet('আর্থিক রিসেট নিশ্চিত করুন',`
-      <div style="text-align:center;padding:12px 0 16px;">
-        <div style="font-size:44px;margin-bottom:12px;">⚠️</div>
-        <div style="font-size:14px;font-weight:700;margin-bottom:8px;">আর্থিক তথ্য শূন্য করবেন?</div>
-        <div style="font-size:12.5px;color:var(--text2);line-height:1.6;">সব লেনদেন ও পেমেন্ট মুছে যাবে।<br>পণ্য ও পার্টি থাকবে।<br><strong style="color:var(--red);">এই কাজ পূর্বাবস্থায় ফেরানো যাবে না।</strong></div>
-      </div>
-      <button class="btn-full btn-danger" style="margin-bottom:8px;" onclick="doResetFinancial()">✅ হ্যাঁ, শূন্য করুন</button>
-      <button class="btn-full btn-ghost" onclick="closeSheet()">বাতিল</button>
-    `);
-  });
-}
-function doResetFinancial(){
-  state.transactions=[];state.payments=[];
-  saveData();renderAll();closeSheet();
-  toast('আর্থিক ডেটা শূন্য করা হয়েছে','info');
-}
-
-</script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js">
-// ══ LOGIN ══
-const PASS='1811192';
-function checkLogin(){
-  const ok=sessionStorage.getItem('sf_auth')==='1';
-  document.getElementById('login-screen').style.display=ok?'none':'flex';
-  document.querySelector('.top-bar').style.display=ok?'flex':'none';
-  document.getElementById('scroll-area').style.display=ok?'block':'none';
-  document.querySelector('.bottom-nav').style.display=ok?'flex':'none';
-  const fab=document.getElementById('fab');if(fab)fab.style.display=ok?'flex':'none';
-  const sb=document.getElementById('d-sidebar');if(sb&&window.innerWidth>=768)sb.style.display=ok?'flex':'none';
-}
-function doLogin(){
-  const pw=document.getElementById('login-pw').value;
-  if(pw===PASS){
-    sessionStorage.setItem('sf_auth','1');
-    checkLogin();
-    toast('স্বাগতম! ✅','success');
-  } else {
-    document.getElementById('login-err').style.display='block';
-    document.getElementById('login-pw').value='';
-    document.getElementById('login-pw').focus();
-  }
-}
-function doLogout(){
-  sessionStorage.removeItem('sf_auth');
-  checkLogin();
-}
-
-// ══ PASSWORD GATE ══
-function pwGate(callback){
-  openSheet('পাসওয়ার্ড নিশ্চিত করুন',`
-    <div style="text-align:center;margin-bottom:16px;font-size:32px;">🔐</div>
-    <div class="field"><label>পাসওয়ার্ড</label>
-      <input id="gate-pw" type="password" placeholder="••••••••" style="font-size:18px;letter-spacing:4px;text-align:center;"
-        onkeydown="if(event.key==='Enter')checkGate()">
-    </div>
-    <div id="gate-err" style="display:none;color:var(--red);font-size:12px;font-weight:600;text-align:center;margin-bottom:10px;">❌ পাসওয়ার্ড ভুল!</div>
-    <button class="btn-full btn-primary" onclick="checkGate()" style="margin-top:4px;">✅ নিশ্চিত করুন</button>
-    <button class="btn-full btn-ghost" onclick="closeSheet()" style="margin-top:8px;">বাতিল</button>
-  `);
-  window._pwGateCallback=callback;
-}
-function checkGate(){
-  const pw=document.getElementById('gate-pw')?.value||'';
-  if(pw===PASS){closeSheet();if(window._pwGateCallback)window._pwGateCallback();}
-  else{const e=document.getElementById('gate-err');if(e)e.style.display='block';document.getElementById('gate-pw').value='';}
-}
-
-// ══ EDIT TRANSACTION ══
-function openEditTx(id){
-  const t=state.transactions.find(x=>x.id===id);if(!t)return;
-  const pr=state.products.find(p=>p.id===t.productId);
-  const vr=state.variants.find(v=>v.id===t.variantId);
-  const pa=state.parties.find(p=>p.id===t.partyId);
-  const typeMap={PURCHASE:'📥 ক্রয়',SALES:'📤 বিক্রয়',RETURN_IN:'↩️ ফেরত আসা',RETURN_OUT:'↪️ ফেরত যাওয়া'};
-  openSheet('লেনদেন সম্পাদনা',`
-    <div style="background:var(--surface2);border-radius:var(--r-sm);padding:11px 13px;margin-bottom:14px;font-size:12.5px;color:var(--text2);">
-      <strong style="color:var(--text);">${esc(pa?.name||'?')}</strong> · ${typeMap[t.type]||t.type}<br>
-      ${esc(pr?.name||'?')} · ${esc(vr?.size||'')} ${vr?.unit||''}
-    </div>
-    <div class="field"><label>তারিখ</label><input id="et-date" type="date" value="${t.date}"></div>
-    <div class="field"><label>পরিমাণ</label><input id="et-qty" type="number" inputmode="decimal" value="${t.qty}" min="0.01" step="0.01"></div>
-    <div class="field"><label>নোট</label><input id="et-note" type="text" value="${esc(t.note||'')}"></div>
-    <div class="field"><label>চালান নং</label><input id="et-inv" type="text" value="${esc(t.invoice||'')}"></div>
-    <div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:var(--r-sm);padding:10px;margin-bottom:14px;font-size:12px;color:var(--yellow);">
-      🔐 মূল্য পরিবর্তনে পাসওয়ার্ড লাগবে
-    </div>
-    <div class="field"><label>একক মূল্য (৳) — পাসওয়ার্ড সংরক্ষিত</label><input id="et-price" type="number" inputmode="decimal" value="${t.price||0}" step="0.01" placeholder="পরিবর্তন করতে পাসওয়ার্ড লাগবে"></div>
-    <button class="btn-full btn-primary" onclick="saveEditTx('${id}')" style="margin-bottom:8px;">💾 সেভ করুন</button>
-    <button class="btn-full btn-ghost" onclick="closeSheet()">বাতিল</button>
-  `);
-}
-
-function saveEditTx(id){
-  const t=state.transactions.find(x=>x.id===id);if(!t)return;
-  const newDate=document.getElementById('et-date').value;
-  const newQty=parseFloat(document.getElementById('et-qty').value);
-  const newNote=document.getElementById('et-note').value.trim();
-  const newInv=document.getElementById('et-inv').value.trim();
-  const newPrice=parseFloat(document.getElementById('et-price').value)||0;
-  if(!newDate||!newQty||newQty<=0){toast('তারিখ ও পরিমাণ দিন','error');return;}
-  const priceChanged=newPrice!==(t.price||0);
-  const doSave=()=>{
-    t.date=newDate;t.qty=newQty;t.note=newNote;t.invoice=newInv;t.price=newPrice;
-    saveData();renderAll();closeSheet();toast('লেনদেন আপডেট হয়েছে ✅','success');
-  };
-  if(priceChanged){pwGate(doSave);}else{doSave();}
-}
-
-// ══ RESET FINANCIAL ══
-function resetFinancial(){
-  pwGate(()=>{
-    openSheet('আর্থিক রিসেট নিশ্চিত করুন',`
-      <div style="text-align:center;padding:12px 0 16px;">
-        <div style="font-size:44px;margin-bottom:12px;">⚠️</div>
-        <div style="font-size:14px;font-weight:700;margin-bottom:8px;">আর্থিক তথ্য শূন্য করবেন?</div>
-        <div style="font-size:12.5px;color:var(--text2);line-height:1.6;">সব লেনদেন ও পেমেন্ট মুছে যাবে।<br>পণ্য ও পার্টি থাকবে।<br><strong style="color:var(--red);">এই কাজ পূর্বাবস্থায় ফেরানো যাবে না।</strong></div>
-      </div>
-      <button class="btn-full btn-danger" style="margin-bottom:8px;" onclick="doResetFinancial()">✅ হ্যাঁ, শূন্য করুন</button>
-      <button class="btn-full btn-ghost" onclick="closeSheet()">বাতিল</button>
-    `);
-  });
-}
-function doResetFinancial(){
-  state.transactions=[];state.payments=[];
-  saveData();renderAll();closeSheet();
-  toast('আর্থিক ডেটা শূন্য করা হয়েছে','info');
-}
-
-</script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js">
-// ══ LOGIN ══
-const PASS='1811192';
-function checkLogin(){
-  const ok=sessionStorage.getItem('sf_auth')==='1';
-  document.getElementById('login-screen').style.display=ok?'none':'flex';
-  document.querySelector('.top-bar').style.display=ok?'flex':'none';
-  document.getElementById('scroll-area').style.display=ok?'block':'none';
-  document.querySelector('.bottom-nav').style.display=ok?'flex':'none';
-  const fab=document.getElementById('fab');if(fab)fab.style.display=ok?'flex':'none';
-  const sb=document.getElementById('d-sidebar');if(sb&&window.innerWidth>=768)sb.style.display=ok?'flex':'none';
-}
-function doLogin(){
-  const pw=document.getElementById('login-pw').value;
-  if(pw===PASS){
-    sessionStorage.setItem('sf_auth','1');
-    checkLogin();
-    toast('স্বাগতম! ✅','success');
-  } else {
-    document.getElementById('login-err').style.display='block';
-    document.getElementById('login-pw').value='';
-    document.getElementById('login-pw').focus();
-  }
-}
-function doLogout(){
-  sessionStorage.removeItem('sf_auth');
-  checkLogin();
-}
-
-// ══ PASSWORD GATE ══
-function pwGate(callback){
-  openSheet('পাসওয়ার্ড নিশ্চিত করুন',`
-    <div style="text-align:center;margin-bottom:16px;font-size:32px;">🔐</div>
-    <div class="field"><label>পাসওয়ার্ড</label>
-      <input id="gate-pw" type="password" placeholder="••••••••" style="font-size:18px;letter-spacing:4px;text-align:center;"
-        onkeydown="if(event.key==='Enter')checkGate()">
-    </div>
-    <div id="gate-err" style="display:none;color:var(--red);font-size:12px;font-weight:600;text-align:center;margin-bottom:10px;">❌ পাসওয়ার্ড ভুল!</div>
-    <button class="btn-full btn-primary" onclick="checkGate()" style="margin-top:4px;">✅ নিশ্চিত করুন</button>
-    <button class="btn-full btn-ghost" onclick="closeSheet()" style="margin-top:8px;">বাতিল</button>
-  `);
-  window._pwGateCallback=callback;
-}
-function checkGate(){
-  const pw=document.getElementById('gate-pw')?.value||'';
-  if(pw===PASS){closeSheet();if(window._pwGateCallback)window._pwGateCallback();}
-  else{const e=document.getElementById('gate-err');if(e)e.style.display='block';document.getElementById('gate-pw').value='';}
-}
-
-// ══ EDIT TRANSACTION ══
-function openEditTx(id){
-  const t=state.transactions.find(x=>x.id===id);if(!t)return;
-  const pr=state.products.find(p=>p.id===t.productId);
-  const vr=state.variants.find(v=>v.id===t.variantId);
-  const pa=state.parties.find(p=>p.id===t.partyId);
-  const typeMap={PURCHASE:'📥 ক্রয়',SALES:'📤 বিক্রয়',RETURN_IN:'↩️ ফেরত আসা',RETURN_OUT:'↪️ ফেরত যাওয়া'};
-  openSheet('লেনদেন সম্পাদনা',`
-    <div style="background:var(--surface2);border-radius:var(--r-sm);padding:11px 13px;margin-bottom:14px;font-size:12.5px;color:var(--text2);">
-      <strong style="color:var(--text);">${esc(pa?.name||'?')}</strong> · ${typeMap[t.type]||t.type}<br>
-      ${esc(pr?.name||'?')} · ${esc(vr?.size||'')} ${vr?.unit||''}
-    </div>
-    <div class="field"><label>তারিখ</label><input id="et-date" type="date" value="${t.date}"></div>
-    <div class="field"><label>পরিমাণ</label><input id="et-qty" type="number" inputmode="decimal" value="${t.qty}" min="0.01" step="0.01"></div>
-    <div class="field"><label>নোট</label><input id="et-note" type="text" value="${esc(t.note||'')}"></div>
-    <div class="field"><label>চালান নং</label><input id="et-inv" type="text" value="${esc(t.invoice||'')}"></div>
-    <div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:var(--r-sm);padding:10px;margin-bottom:14px;font-size:12px;color:var(--yellow);">
-      🔐 মূল্য পরিবর্তনে পাসওয়ার্ড লাগবে
-    </div>
-    <div class="field"><label>একক মূল্য (৳) — পাসওয়ার্ড সংরক্ষিত</label><input id="et-price" type="number" inputmode="decimal" value="${t.price||0}" step="0.01" placeholder="পরিবর্তন করতে পাসওয়ার্ড লাগবে"></div>
-    <button class="btn-full btn-primary" onclick="saveEditTx('${id}')" style="margin-bottom:8px;">💾 সেভ করুন</button>
-    <button class="btn-full btn-ghost" onclick="closeSheet()">বাতিল</button>
-  `);
-}
-
-function saveEditTx(id){
-  const t=state.transactions.find(x=>x.id===id);if(!t)return;
-  const newDate=document.getElementById('et-date').value;
-  const newQty=parseFloat(document.getElementById('et-qty').value);
-  const newNote=document.getElementById('et-note').value.trim();
-  const newInv=document.getElementById('et-inv').value.trim();
-  const newPrice=parseFloat(document.getElementById('et-price').value)||0;
-  if(!newDate||!newQty||newQty<=0){toast('তারিখ ও পরিমাণ দিন','error');return;}
-  const priceChanged=newPrice!==(t.price||0);
-  const doSave=()=>{
-    t.date=newDate;t.qty=newQty;t.note=newNote;t.invoice=newInv;t.price=newPrice;
-    saveData();renderAll();closeSheet();toast('লেনদেন আপডেট হয়েছে ✅','success');
-  };
-  if(priceChanged){pwGate(doSave);}else{doSave();}
-}
-
-// ══ RESET FINANCIAL ══
-function resetFinancial(){
-  pwGate(()=>{
-    openSheet('আর্থিক রিসেট নিশ্চিত করুন',`
-      <div style="text-align:center;padding:12px 0 16px;">
-        <div style="font-size:44px;margin-bottom:12px;">⚠️</div>
-        <div style="font-size:14px;font-weight:700;margin-bottom:8px;">আর্থিক তথ্য শূন্য করবেন?</div>
-        <div style="font-size:12.5px;color:var(--text2);line-height:1.6;">সব লেনদেন ও পেমেন্ট মুছে যাবে।<br>পণ্য ও পার্টি থাকবে।<br><strong style="color:var(--red);">এই কাজ পূর্বাবস্থায় ফেরানো যাবে না।</strong></div>
-      </div>
-      <button class="btn-full btn-danger" style="margin-bottom:8px;" onclick="doResetFinancial()">✅ হ্যাঁ, শূন্য করুন</button>
-      <button class="btn-full btn-ghost" onclick="closeSheet()">বাতিল</button>
-    `);
-  });
-}
-function doResetFinancial(){
-  state.transactions=[];state.payments=[];
-  saveData();renderAll();closeSheet();
-  toast('আর্থিক ডেটা শূন্য করা হয়েছে','info');
-}
-
-</script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics-compat.js">
-// ══ LOGIN ══
-const PASS='1811192';
-function checkLogin(){
-  const ok=sessionStorage.getItem('sf_auth')==='1';
-  document.getElementById('login-screen').style.display=ok?'none':'flex';
-  document.querySelector('.top-bar').style.display=ok?'flex':'none';
-  document.getElementById('scroll-area').style.display=ok?'block':'none';
-  document.querySelector('.bottom-nav').style.display=ok?'flex':'none';
-  const fab=document.getElementById('fab');if(fab)fab.style.display=ok?'flex':'none';
-  const sb=document.getElementById('d-sidebar');if(sb&&window.innerWidth>=768)sb.style.display=ok?'flex':'none';
-}
-function doLogin(){
-  const pw=document.getElementById('login-pw').value;
-  if(pw===PASS){
-    sessionStorage.setItem('sf_auth','1');
-    checkLogin();
-    toast('স্বাগতম! ✅','success');
-  } else {
-    document.getElementById('login-err').style.display='block';
-    document.getElementById('login-pw').value='';
-    document.getElementById('login-pw').focus();
-  }
-}
-function doLogout(){
-  sessionStorage.removeItem('sf_auth');
-  checkLogin();
-}
-
-// ══ PASSWORD GATE ══
-function pwGate(callback){
-  openSheet('পাসওয়ার্ড নিশ্চিত করুন',`
-    <div style="text-align:center;margin-bottom:16px;font-size:32px;">🔐</div>
-    <div class="field"><label>পাসওয়ার্ড</label>
-      <input id="gate-pw" type="password" placeholder="••••••••" style="font-size:18px;letter-spacing:4px;text-align:center;"
-        onkeydown="if(event.key==='Enter')checkGate()">
-    </div>
-    <div id="gate-err" style="display:none;color:var(--red);font-size:12px;font-weight:600;text-align:center;margin-bottom:10px;">❌ পাসওয়ার্ড ভুল!</div>
-    <button class="btn-full btn-primary" onclick="checkGate()" style="margin-top:4px;">✅ নিশ্চিত করুন</button>
-    <button class="btn-full btn-ghost" onclick="closeSheet()" style="margin-top:8px;">বাতিল</button>
-  `);
-  window._pwGateCallback=callback;
-}
-function checkGate(){
-  const pw=document.getElementById('gate-pw')?.value||'';
-  if(pw===PASS){closeSheet();if(window._pwGateCallback)window._pwGateCallback();}
-  else{const e=document.getElementById('gate-err');if(e)e.style.display='block';document.getElementById('gate-pw').value='';}
-}
-
-// ══ EDIT TRANSACTION ══
-function openEditTx(id){
-  const t=state.transactions.find(x=>x.id===id);if(!t)return;
-  const pr=state.products.find(p=>p.id===t.productId);
-  const vr=state.variants.find(v=>v.id===t.variantId);
-  const pa=state.parties.find(p=>p.id===t.partyId);
-  const typeMap={PURCHASE:'📥 ক্রয়',SALES:'📤 বিক্রয়',RETURN_IN:'↩️ ফেরত আসা',RETURN_OUT:'↪️ ফেরত যাওয়া'};
-  openSheet('লেনদেন সম্পাদনা',`
-    <div style="background:var(--surface2);border-radius:var(--r-sm);padding:11px 13px;margin-bottom:14px;font-size:12.5px;color:var(--text2);">
-      <strong style="color:var(--text);">${esc(pa?.name||'?')}</strong> · ${typeMap[t.type]||t.type}<br>
-      ${esc(pr?.name||'?')} · ${esc(vr?.size||'')} ${vr?.unit||''}
-    </div>
-    <div class="field"><label>তারিখ</label><input id="et-date" type="date" value="${t.date}"></div>
-    <div class="field"><label>পরিমাণ</label><input id="et-qty" type="number" inputmode="decimal" value="${t.qty}" min="0.01" step="0.01"></div>
-    <div class="field"><label>নোট</label><input id="et-note" type="text" value="${esc(t.note||'')}"></div>
-    <div class="field"><label>চালান নং</label><input id="et-inv" type="text" value="${esc(t.invoice||'')}"></div>
-    <div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:var(--r-sm);padding:10px;margin-bottom:14px;font-size:12px;color:var(--yellow);">
-      🔐 মূল্য পরিবর্তনে পাসওয়ার্ড লাগবে
-    </div>
-    <div class="field"><label>একক মূল্য (৳) — পাসওয়ার্ড সংরক্ষিত</label><input id="et-price" type="number" inputmode="decimal" value="${t.price||0}" step="0.01" placeholder="পরিবর্তন করতে পাসওয়ার্ড লাগবে"></div>
-    <button class="btn-full btn-primary" onclick="saveEditTx('${id}')" style="margin-bottom:8px;">💾 সেভ করুন</button>
-    <button class="btn-full btn-ghost" onclick="closeSheet()">বাতিল</button>
-  `);
-}
-
-function saveEditTx(id){
-  const t=state.transactions.find(x=>x.id===id);if(!t)return;
-  const newDate=document.getElementById('et-date').value;
-  const newQty=parseFloat(document.getElementById('et-qty').value);
-  const newNote=document.getElementById('et-note').value.trim();
-  const newInv=document.getElementById('et-inv').value.trim();
-  const newPrice=parseFloat(document.getElementById('et-price').value)||0;
-  if(!newDate||!newQty||newQty<=0){toast('তারিখ ও পরিমাণ দিন','error');return;}
-  const priceChanged=newPrice!==(t.price||0);
-  const doSave=()=>{
-    t.date=newDate;t.qty=newQty;t.note=newNote;t.invoice=newInv;t.price=newPrice;
-    saveData();renderAll();closeSheet();toast('লেনদেন আপডেট হয়েছে ✅','success');
-  };
-  if(priceChanged){pwGate(doSave);}else{doSave();}
-}
-
-// ══ RESET FINANCIAL ══
-function resetFinancial(){
-  pwGate(()=>{
-    openSheet('আর্থিক রিসেট নিশ্চিত করুন',`
-      <div style="text-align:center;padding:12px 0 16px;">
-        <div style="font-size:44px;margin-bottom:12px;">⚠️</div>
-        <div style="font-size:14px;font-weight:700;margin-bottom:8px;">আর্থিক তথ্য শূন্য করবেন?</div>
-        <div style="font-size:12.5px;color:var(--text2);line-height:1.6;">সব লেনদেন ও পেমেন্ট মুছে যাবে।<br>পণ্য ও পার্টি থাকবে।<br><strong style="color:var(--red);">এই কাজ পূর্বাবস্থায় ফেরানো যাবে না।</strong></div>
-      </div>
-      <button class="btn-full btn-danger" style="margin-bottom:8px;" onclick="doResetFinancial()">✅ হ্যাঁ, শূন্য করুন</button>
-      <button class="btn-full btn-ghost" onclick="closeSheet()">বাতিল</button>
-    `);
-  });
-}
-function doResetFinancial(){
-  state.transactions=[];state.payments=[];
-  saveData();renderAll();closeSheet();
-  toast('আর্থিক ডেটা শূন্য করা হয়েছে','info');
-}
-
-</script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -836,7 +170,9 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);-webk
 .b-purchase{background:rgba(16,185,129,.15);color:var(--green);}
 .b-sales{background:rgba(239,68,68,.15);color:var(--red);}
 .b-return_in{background:rgba(79,110,247,.15);color:var(--accent);}
+.b-returnin{background:rgba(79,110,247,.15);color:var(--accent);}
 .b-return_out{background:rgba(245,158,11,.15);color:var(--yellow);}
+.b-returnout{background:rgba(245,158,11,.15);color:var(--yellow);}
 .b-supplier{background:rgba(6,182,212,.15);color:var(--cyan);}
 .b-customer{background:rgba(124,58,237,.15);color:#a78bfa;}
 .b-low{background:rgba(239,68,68,.15);color:var(--red);}
@@ -900,7 +236,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);-webk
 .pay-bar{height:6px;background:var(--surface2);border-radius:3px;margin-top:6px;overflow:hidden;}
 .pay-fill{height:100%;background:linear-gradient(90deg,var(--green),var(--cyan));border-radius:3px;transition:width .4s ease;}
 
-/* DESKTOP sidebar */
+/* DESKTOP SIDEBAR */
 @media(min-width:768px){
   html,body{overflow:hidden;}
   .scroll-area{position:fixed;top:var(--top-h);left:220px;right:0;bottom:0;overflow-y:auto;overflow-x:hidden;}
@@ -922,6 +258,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);-webk
   .acc-summary-grid{grid-template-columns:repeat(4,1fr);}
 }
 ::-webkit-scrollbar{display:none;}
+@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
 </style>
 </head>
 <body>
@@ -960,7 +297,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);-webk
 </div>
 
 <!-- DESKTOP SIDEBAR -->
-<div class="d-sidebar" id="d-sidebar" style="display:none!important;visibility:hidden;">
+<div class="d-sidebar" id="d-sidebar" style="display:none;">
   <div class="d-item active" data-p="dashboard"><span class="d-ico">📊</span>ড্যাশবোর্ড</div>
   <div class="d-item" data-p="products"><span class="d-ico">🏷️</span>পণ্য</div>
   <div class="d-item" data-p="parties"><span class="d-ico">🤝</span>পার্টি</div>
@@ -993,7 +330,6 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);-webk
     <div class="stat-card sc-p"><div class="sc-icon">📝</div><div class="sc-lbl">লেনদেন</div><div class="sc-val" id="d-txn">0</div><div class="sc-sub">সর্বমোট</div></div>
   </div>
 
-  <!-- Accounting summary on dashboard -->
   <div class="stat-grid" style="margin-bottom:12px;">
     <div class="stat-card sc-g"><div class="sc-icon">💵</div><div class="sc-lbl">মোট বিক্রয়</div><div class="sc-val" id="d-sales-amt" style="font-size:18px;">৳০</div><div class="sc-sub">আজকের হিসাব</div></div>
     <div class="stat-card sc-y"><div class="sc-icon">📉</div><div class="sc-lbl">বকেয়া পাওনা</div><div class="sc-val" id="d-due-amt" style="font-size:18px;">৳০</div><div class="sc-sub">কাস্টমার বকেয়া</div></div>
@@ -1027,7 +363,6 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);-webk
 <div class="page" id="pg-transactions">
   <div style="margin-bottom:14px;"><div style="font-size:20px;font-weight:800;">নতুন লেনদেন 🔄</div><div style="font-size:12px;color:var(--text2);margin-top:2px;">পার্টি বেছে মাল যোগ করুন</div></div>
 
-  <!-- Step 1: Type + Party + Date -->
   <div class="form-card">
     <div class="type-pills" style="margin-bottom:12px;">
       <div class="tp" data-v="PURCHASE" onclick="selType('PURCHASE')">📥<br>ক্রয়</div>
@@ -1036,7 +371,6 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);-webk
       <div class="tp" data-v="RETURN_OUT" onclick="selType('RETURN_OUT')">↪️<br>ফেরত যাওয়া</div>
     </div>
     <div class="field"><label>পার্টি</label><select id="trans-party" onchange="onPartyChange()"><option value="">— পার্টি বেছে নিন —</option></select></div>
-    <!-- Party balance preview -->
     <div id="party-bal-box" style="display:none;background:var(--surface2);border-radius:var(--r-sm);padding:10px 13px;margin-bottom:12px;font-size:12px;color:var(--text2);display:flex;align-items:center;justify-content:space-between;">
       <span>বর্তমান বকেয়া:</span><strong id="party-bal-val" style="font-family:'JetBrains Mono',monospace;"></strong>
     </div>
@@ -1047,14 +381,12 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);-webk
     <div class="field" style="margin-top:12px;"><label>নোট (ঐচ্ছিক)</label><input type="text" id="trans-note" placeholder="মন্তব্য…"></div>
   </div>
 
-  <!-- Step 2: Item list -->
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
     <div style="font-size:13px;font-weight:700;">📦 মালের তালিকা</div>
     <button class="ibt ibt-a" style="width:auto;padding:0 12px;font-size:12px;font-weight:700;border-radius:20px;" onclick="openAddItem()">＋ মাল যোগ</button>
   </div>
   <div id="cart-list" style="margin-bottom:10px;"></div>
 
-  <!-- Cart totals -->
   <div id="cart-summary" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:13px 14px;margin-bottom:12px;">
     <div style="display:flex;justify-content:space-between;margin-bottom:6px;font-size:13px;">
       <span style="color:var(--text2);">মোট পণ্যমূল্য</span>
@@ -1082,10 +414,8 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);-webk
 <div class="page" id="pg-accounting">
   <div style="margin-bottom:14px;"><div style="font-size:20px;font-weight:800;">হিসাব 💰</div><div style="font-size:12px;color:var(--text2);margin-top:2px;">আয়-ব্যয় ও পাওনা-দেনা</div></div>
 
-  <!-- Summary -->
   <div class="acc-summary-grid" id="acc-summary"></div>
 
-  <!-- Date filter -->
   <div class="date-row" style="margin-bottom:12px;">
     <input type="date" id="acc-ds" onchange="renderAccounting()">
     <input type="date" id="acc-de" onchange="renderAccounting()">
@@ -1097,14 +427,12 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);-webk
     <button class="chip" onclick="setAccPeriod('all',this)">সব</button>
   </div>
 
-  <!-- Profit chart -->
   <div class="chart-card"><div class="ch-title">📊 আয়-ব্যয় বিশ্লেষণ</div><div style="height:180px;position:relative;"><canvas id="profitChart"></canvas></div></div>
 
   <div class="pdf-row">
     <button class="pdf-btn pdf-acc" onclick="dlAccountingPDF()" style="grid-column:span 2;">💰 হিসাব রিপোর্ট PDF</button>
   </div>
 
-  <!-- Party ledger -->
   <div class="divider">📒 পার্টি লেজার</div>
   <div class="search-bar"><span class="s-ico">🔍</span><input type="text" id="ledger-search" placeholder="পার্টি খুঁজুন…" oninput="renderLedger()"></div>
   <div class="chip-row">
@@ -1115,7 +443,6 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);-webk
   </div>
   <div id="ledger-list"></div>
 
-  <!-- Extra payments -->
   <div class="divider">💸 অতিরিক্ত পেমেন্ট</div>
   <button class="btn-full btn-ghost" style="margin-bottom:12px;" onclick="openAddPayment()">➕ পেমেন্ট যোগ করুন</button>
   <div id="payment-list"></div>
@@ -1185,8 +512,19 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);-webk
   </div>
 </div>
 
+<!-- Firebase SDKs -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics-compat.js"></script>
+
 <script>
-// ══ FIREBASE CONFIG ══
+// ══ CONFIG ══
+const PASS='1811192';
+
+// ══ FIREBASE ══
 const firebaseConfig = {
   apiKey: "AIzaSyDbJ1-AyupHZBZ6EPI-21EOlC_i-JWO00s",
   authDomain: "stockflow-3e549.firebaseapp.com",
@@ -1207,7 +545,9 @@ let sChart=null,tChart=null,pChart=null,curPage='dashboard',selTxType='PURCHASE'
 let hTF='',hPF='',ledgerFilter='all';
 const LOW=5;
 let _fbSaveTimeout=null;
+let cart=[];
 
+// ══ INIT ══
 document.addEventListener('DOMContentLoaded',()=>{
   showLoading(true);
   DB_REF.on('value',(snapshot)=>{
@@ -1231,7 +571,6 @@ document.addEventListener('DOMContentLoaded',()=>{
     const now=new Date();
     document.getElementById('dash-date').textContent=now.toLocaleDateString('bn-BD',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
     selType('PURCHASE');
-    // Default accounting period = this month
     const y=now.getFullYear(),m=String(now.getMonth()+1).padStart(2,'0');
     document.getElementById('acc-ds').value=`${y}-${m}-01`;
     document.getElementById('acc-de').value=today();
@@ -1245,15 +584,26 @@ document.addEventListener('DOMContentLoaded',()=>{
     selType('PURCHASE');
   });
 
-  if(window.innerWidth>=768){
-    document.getElementById('d-sidebar').style.display='flex';
-    document.querySelectorAll('#d-sidebar .d-item').forEach(it=>it.addEventListener('click',()=>showPage(it.dataset.p)));
-  }
-  window.addEventListener('resize',()=>{
-    const sb=document.getElementById('d-sidebar');
-    if(sb)sb.style.display=window.innerWidth>=768?'flex':'none';
-  });
+  // Desktop sidebar setup
+  document.querySelectorAll('#d-sidebar .d-item').forEach(it=>it.addEventListener('click',()=>showPage(it.dataset.p)));
+  handleResize();
+  window.addEventListener('resize', handleResize);
 });
+
+function handleResize(){
+  const sb=document.getElementById('d-sidebar');
+  if(!sb) return;
+  const ok=sessionStorage.getItem('sf_auth')==='1';
+  if(window.innerWidth>=768){
+    sb.style.display=ok?'flex':'none';
+    const sa=document.getElementById('scroll-area');
+    if(sa) sa.style.left=ok?'220px':'0';
+  } else {
+    sb.style.display='none';
+    const sa=document.getElementById('scroll-area');
+    if(sa) sa.style.left='0';
+  }
+}
 
 function showLoading(show){
   let el=document.getElementById('fb-loading');
@@ -1262,20 +612,66 @@ function showLoading(show){
     el.id='fb-loading';
     el.style.cssText='position:fixed;inset:0;background:rgba(15,17,23,.92);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;';
     el.innerHTML='<div style="font-size:38px;animation:spin 1s linear infinite">🔄</div><div style="font-size:14px;font-weight:700;color:#e8eaf6;">Firebase থেকে ডেটা লোড হচ্ছে…</div>';
-    const style=document.createElement('style');
-    style.textContent='@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}';
-    document.head.appendChild(style);
     document.body.appendChild(el);
   }
   el.style.display=show?'flex':'none';
 }
 
+// ══ HELPERS ══
 function today(){return new Date().toISOString().split('T')[0];}
 function gid(){return Date.now().toString(36)+Math.random().toString(36).substr(2,5);}
 function esc(s){if(!s)return '';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function fmt(n){return '৳'+(Number(n)||0).toLocaleString('bn-BD',{minimumFractionDigits:0,maximumFractionDigits:2});}
 function fmtN(n){return (Number(n)||0).toLocaleString('bn-BD',{minimumFractionDigits:0,maximumFractionDigits:2});}
 
+// ══ LOGIN ══
+function checkLogin(){
+  const ok=sessionStorage.getItem('sf_auth')==='1';
+  document.getElementById('login-screen').style.display=ok?'none':'flex';
+  document.querySelector('.top-bar').style.display=ok?'flex':'none';
+  document.getElementById('scroll-area').style.display=ok?'block':'none';
+  document.querySelector('.bottom-nav').style.display=ok?'flex':'none';
+  const fab=document.getElementById('fab');if(fab)fab.style.display=ok?'flex':'none';
+  handleResize();
+}
+function doLogin(){
+  const pw=document.getElementById('login-pw').value;
+  if(pw===PASS){
+    sessionStorage.setItem('sf_auth','1');
+    checkLogin();
+    toast('স্বাগতম! ✅','success');
+  } else {
+    document.getElementById('login-err').style.display='block';
+    document.getElementById('login-pw').value='';
+    document.getElementById('login-pw').focus();
+  }
+}
+function doLogout(){
+  sessionStorage.removeItem('sf_auth');
+  checkLogin();
+}
+
+// ══ PASSWORD GATE ══
+function pwGate(callback){
+  openSheet('পাসওয়ার্ড নিশ্চিত করুন',`
+    <div style="text-align:center;margin-bottom:16px;font-size:32px;">🔐</div>
+    <div class="field"><label>পাসওয়ার্ড</label>
+      <input id="gate-pw" type="password" placeholder="••••••••" style="font-size:18px;letter-spacing:4px;text-align:center;"
+        onkeydown="if(event.key==='Enter')checkGate()">
+    </div>
+    <div id="gate-err" style="display:none;color:var(--red);font-size:12px;font-weight:600;text-align:center;margin-bottom:10px;">❌ পাসওয়ার্ড ভুল!</div>
+    <button class="btn-full btn-primary" onclick="checkGate()" style="margin-top:4px;">✅ নিশ্চিত করুন</button>
+    <button class="btn-full btn-ghost" onclick="closeSheet()" style="margin-top:8px;">বাতিল</button>
+  `);
+  window._pwGateCallback=callback;
+}
+function checkGate(){
+  const pw=document.getElementById('gate-pw')?.value||'';
+  if(pw===PASS){closeSheet();if(window._pwGateCallback)window._pwGateCallback();}
+  else{const e=document.getElementById('gate-err');if(e)e.style.display='block';document.getElementById('gate-pw').value='';}
+}
+
+// ══ SAVE DATA ══
 function saveData(){
   if(_fbSaveTimeout)clearTimeout(_fbSaveTimeout);
   _fbSaveTimeout=setTimeout(()=>{
@@ -1322,7 +718,6 @@ function prodTotal(pid){return state.variants.filter(v=>v.productId===pid).reduc
 
 // ══ ACCOUNTING CALC ══
 function calcPartyBalance(partyId){
-  // positive = party owes us; negative = we owe party
   let balance=0;
   state.transactions.filter(t=>t.partyId===partyId).forEach(t=>{
     const total=(Number(t.price)||0)*(Number(t.qty)||0);
@@ -1331,7 +726,6 @@ function calcPartyBalance(partyId){
     else if(t.type==='RETURN_IN') balance+=total;
     else if(t.type==='RETURN_OUT') balance-=total;
   });
-  // all payments (from submitTx + manual)
   state.payments.filter(p=>p.partyId===partyId).forEach(p=>{
     if(p.direction==='received') balance-=Number(p.amount)||0;
     else balance+=Number(p.amount)||0;
@@ -1348,7 +742,6 @@ function getAccStats(ds,de){
     if(t.type==='SALES'){salesAmt+=total;collectedAmt+=paid;salesQty+=Number(t.qty)||0;}
     else if(t.type==='PURCHASE'){purchaseAmt+=total;purchaseQty+=Number(t.qty)||0;}
   });
-  // standalone payments in period
   const extraPaid=state.payments.filter(p=>(!ds||p.date>=ds)&&(!de||p.date<=de)&&p.direction==='received').reduce((s,p)=>s+Number(p.amount),0);
   collectedAmt+=extraPaid;
   const profit=salesAmt-purchaseAmt;
@@ -1384,19 +777,17 @@ function renderDashboard(){
   document.getElementById('d-low').textContent=low;
   updateSidebar();
 
-  // Accounting on dashboard
   const stats=getAccStats('','');
   document.getElementById('d-sales-amt').textContent=fmt(stats.salesAmt);
   document.getElementById('d-due-amt').textContent=fmt(stats.totalDue);
 
-  // bar chart
   if(sChart)sChart.destroy();
   sChart=new Chart(document.getElementById('stockChart').getContext('2d'),{type:'bar',
     data:{labels:lbs,datasets:[{label:'স্টক',data:dt,backgroundColor:cls,borderRadius:6}]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
       scales:{x:{ticks:{color:'#8b90a7',font:{size:10}},grid:{color:'rgba(255,255,255,.04)'}},
               y:{beginAtZero:true,ticks:{color:'#8b90a7',font:{size:10}},grid:{color:'rgba(255,255,255,.07)'}}}}});
-  // doughnut
+
   const tc={PURCHASE:0,SALES:0,RETURN_IN:0,RETURN_OUT:0};
   state.transactions.forEach(t=>{if(tc[t.type]!==undefined)tc[t.type]++;});
   if(tChart)tChart.destroy();
@@ -1406,7 +797,6 @@ function renderDashboard(){
     options:{responsive:true,maintainAspectRatio:false,cutout:'60%',
       plugins:{legend:{position:'right',labels:{color:'#8b90a7',font:{size:10},padding:10,boxWidth:10}}}}});
 
-  // low stock
   const ll=document.getElementById('low-list');
   const lowItems=state.variants.map(v=>({v,prod:state.products.find(p=>p.id===v.productId),s:calcStock(v.productId,v.id)})).filter(x=>x.s<LOW).sort((a,b)=>a.s-b.s);
   if(!lowItems.length){ll.innerHTML=`<div class="list-card"><div style="text-align:center;padding:18px;color:var(--green);font-size:13px;">✅ সব পণ্যের পর্যাপ্ত স্টক আছে</div></div>`;}
@@ -1417,14 +807,13 @@ function renderDashboard(){
       <div class="li-right"><div style="font-size:14px;font-weight:800;color:var(--red);font-family:'JetBrains Mono',monospace;">${x.s}</div><div style="font-size:10px;color:var(--text2);">বাকি</div></div>
     </div>`).join('')+'</div>';}
 
-  // recent
   const rt=document.getElementById('recent-list');
   const rec=[...state.transactions].sort((a,b)=>b.timestamp-a.timestamp).slice(0,5);
   if(!rec.length){rt.innerHTML=`<div style="text-align:center;color:var(--text2);padding:20px;font-size:13px;">কোনো লেনদেন নেই</div>`;return;}
   rt.innerHTML=rec.map(t=>txCard(t)).join('');
 }
 
-function txCard(t, showDel=false){
+function txCard(t,showDel=false){
   const pr=state.products.find(p=>p.id===t.productId);
   const vr=state.variants.find(v=>v.id===t.variantId);
   const pa=state.parties.find(p=>p.id===t.partyId);
@@ -1457,7 +846,7 @@ function txCard(t, showDel=false){
 function delOneTx(id){
   pwGate(()=>{
     state.transactions=state.transactions.filter(t=>t.id!==id);
-    saveData(); renderAll();
+    saveData();renderAll();
     toast('এন্ট্রি মুছে গেছে','info');
   });
 }
@@ -1500,13 +889,13 @@ function renderProducts(){
 function renderParties(){
   const el=document.getElementById('party-list');
   const q=(document.getElementById('party-search')?.value||'').toLowerCase();
-  const list=state.parties.filter(p=>!q||p.name.toLowerCase().includes(q));
-  if(!list.length){el.innerHTML=`<div class="empty"><div class="e-ico">🤝</div><p>কোনো পার্টি নেই</p><small>＋ চাপুন সরবরাহকারী বা গ্রাহক যোগ করতে</small></div>`;return;}
+  const list=state.parties.filter(p=>!q||p.name.toLowerCase().includes(q)||(p.contact||'').toLowerCase().includes(q));
+  if(!list.length){el.innerHTML=`<div class="empty"><div class="e-ico">🤝</div><p>কোনো পার্টি নেই</p><small>＋ চাপুন প্রথম পার্টি যোগ করতে</small></div>`;return;}
   el.innerHTML=list.map(p=>{
-    const txC=state.transactions.filter(t=>t.partyId===p.id).length;
     const sup=p.type==='Supplier';
     const bal=calcPartyBalance(p.id);
-    const balStr=bal>0?`<span style="color:var(--red);font-size:11px;font-weight:700;">পাওনা ${fmt(bal)}</span>`:bal<0?`<span style="color:var(--yellow);font-size:11px;font-weight:700;">দেনা ${fmt(-bal)}</span>`:`<span style="color:var(--green);font-size:11px;font-weight:700;">নিষ্পত্তি</span>`;
+    const txC=state.transactions.filter(t=>t.partyId===p.id).length;
+    const balStr=bal>0?`<span style="color:var(--red);">পাওনা ${fmt(bal)}</span>`:bal<0?`<span style="color:var(--yellow);">দেনা ${fmt(-bal)}</span>`:`<span style="color:var(--green);">নিষ্পত্তি</span>`;
     return `<div class="party-card">
       <div class="pty-ava" style="background:${sup?'rgba(6,182,212,.15)':'rgba(124,58,237,.15)'};">${sup?'🏭':'🛒'}</div>
       <div style="flex:1;min-width:0;">
@@ -1523,7 +912,7 @@ function renderParties(){
 }
 
 // ══ ACCOUNTING ══
-function setAccPeriod(period, el){
+function setAccPeriod(period,el){
   document.querySelectorAll('#pg-accounting .chip').forEach(c=>c.classList.remove('active'));
   el.classList.add('active');
   const now=new Date(),y=now.getFullYear(),m=now.getMonth();
@@ -1539,7 +928,6 @@ function renderAccounting(){
   const de=document.getElementById('acc-de')?.value||'';
   const stats=getAccStats(ds,de);
 
-  // Summary boxes
   const sumEl=document.getElementById('acc-summary');
   sumEl.innerHTML=`
     <div class="acc-sum-box"><div class="acc-sum-lbl">মোট বিক্রয়</div><div class="acc-sum-val" style="color:var(--green);font-size:16px;">${fmt(stats.salesAmt)}</div></div>
@@ -1548,7 +936,6 @@ function renderAccounting(){
     <div class="acc-sum-box"><div class="acc-sum-lbl">বকেয়া পাওনা</div><div class="acc-sum-val" style="color:var(--yellow);font-size:16px;">${fmt(stats.totalDue)}</div></div>
   `;
 
-  // Profit chart — last 7 days
   const days=[];const salesD=[];const purchD=[];
   for(let i=6;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);const ds2=d.toISOString().split('T')[0];days.push(d.toLocaleDateString('bn-BD',{day:'numeric',month:'short'}));
     const dayTxs=state.transactions.filter(t=>t.date===ds2);
@@ -1621,9 +1008,6 @@ function renderPayments(){
     </div>`;
   }).join('');
 }
-
-// ══ CART STATE ══
-let cart=[]; // [{pid,vid,qty,price}]
 
 // ══ DROPDOWNS ══
 function renderDropdowns(){
@@ -1710,13 +1094,11 @@ function addToCart(){
   const price=parseFloat(document.getElementById('ci-price').value)||0;
   if(!pid||!vid){toast('পণ্য ও ভেরিয়েন্ট বেছে নিন','error');return;}
   if(!qty||qty<=0){toast('পরিমাণ দিন','error');return;}
-  // stock check for outgoing
   if(selTxType==='SALES'||selTxType==='RETURN_OUT'){
     const cur=calcStock(pid,vid);
     const inCart=cart.filter(c=>c.pid===pid&&c.vid===vid).reduce((s,c)=>s+c.qty,0);
     if(qty+inCart>cur){toast(`পর্যাপ্ত স্টক নেই! বর্তমান: ${cur}`,'error');return;}
   }
-  // if same variant already in cart, update qty
   const existing=cart.find(c=>c.pid===pid&&c.vid===vid);
   if(existing){existing.qty+=qty;existing.price=price;}
   else{
@@ -1778,30 +1160,28 @@ function submitTx(){
   if(!partyId){toast('পার্টি বেছে নিন','error');return;}
   if(!date){toast('তারিখ দিন','error');return;}
   if(!cart.length){toast('অন্তত একটি মাল যোগ করুন','error');return;}
-  // Save each cart item as individual transaction line, all linked by a group id
   const groupId=gid();
   const subtotal=cart.reduce((s,c)=>s+c.qty*c.price,0);
+  const itemCount=cart.length;
   cart.forEach((c,i)=>{
     state.transactions.push({
       id:gid(),groupId,partyId,type:selTxType,
       productId:c.pid,variantId:c.vid,qty:c.qty,price:c.price,
-      paid: i===0?paid:0, // attach payment to first line only
+      paid: i===0?paid:0,
       subtotal: i===0?subtotal:0,
       date,note,invoice,timestamp:Date.now()
     });
   });
-  // If paid > 0, also record as a payment entry for cleaner ledger
   if(paid>0){
     state.payments.push({
       id:gid(),partyId,
       amount:paid,
       direction: (selTxType==='PURCHASE'||selTxType==='RETURN_IN')?'paid':'received',
-      date,note:'লেনদেন পরিশোধ'+( invoice?' · '+invoice:''),
+      date,note:'লেনদেন পরিশোধ'+(invoice?' · '+invoice:''),
       groupId,timestamp:Date.now()
     });
   }
   saveData();renderAll();
-  // Reset form
   cart=[];
   document.getElementById('trans-party').value='';
   document.getElementById('trans-date').value=today();
@@ -1810,7 +1190,7 @@ function submitTx(){
   document.getElementById('trans-paid').value='';
   document.getElementById('party-bal-box').style.display='none';
   renderCart();
-  toast(`লেনদেন রেকর্ড হয়েছে! ${cart.length} আইটেম ✅`,'success');
+  toast(`লেনদেন রেকর্ড হয়েছে! ${itemCount} আইটেম ✅`,'success');
 }
 
 // ══ HISTORY ══
@@ -1836,14 +1216,13 @@ function renderHistory(){
   if(cnt)cnt.textContent=`${filtered.length} রেকর্ড · নেট: ${fmt(total)}`;
   const el=document.getElementById('hist-list');
   if(!filtered.length){el.innerHTML=`<div class="empty"><div class="e-ico">📋</div><p>কোনো লেনদেন পাওয়া যায়নি</p><small>ফিল্টার পরিবর্তন করুন</small></div>`;return;}
-  // Table view
-  const rows=filtered.map((t,i)=>{
+  const typeMap={PURCHASE:'📥 ক্রয়',SALES:'📤 বিক্রয়',RETURN_IN:'↩️ ফেরত আসা',RETURN_OUT:'↪️ ফেরত যাওয়া'};
+  const QS={PURCHASE:'+',SALES:'−',RETURN_IN:'+',RETURN_OUT:'−'};
+  const QC={PURCHASE:'#10b981',SALES:'#ef4444',RETURN_IN:'#4f6ef7',RETURN_OUT:'#f59e0b'};
+  const rows=filtered.map(t=>{
     const pr=state.products.find(p=>p.id===t.productId);
     const vr=state.variants.find(v=>v.id===t.variantId);
     const pa=state.parties.find(p=>p.id===t.partyId);
-    const typeMap={PURCHASE:'📥 ক্রয়',SALES:'📤 বিক্রয়',RETURN_IN:'↩️ ফেরত আসা',RETURN_OUT:'↪️ ফেরত যাওয়া'};
-    const QS={PURCHASE:'+',SALES:'−',RETURN_IN:'+',RETURN_OUT:'−'};
-    const QC={PURCHASE:'#10b981',SALES:'#ef4444',RETURN_IN:'#4f6ef7',RETURN_OUT:'#f59e0b'};
     const total=(Number(t.price)||0)*(Number(t.qty)||0);
     return `<tr style="border-bottom:1px solid var(--border);">
       <td style="padding:9px 10px;font-size:11.5px;color:var(--text2);white-space:nowrap;">${t.date}</td>
@@ -1858,17 +1237,16 @@ function renderHistory(){
   }).join('');
   el.innerHTML=`<div style="overflow-x:auto;border-radius:var(--r);border:1px solid var(--border);background:var(--surface);">
     <table style="width:100%;border-collapse:collapse;min-width:480px;">
-      <thead>
-        <tr style="background:var(--surface2);">
-          <th style="padding:9px 10px;font-size:10px;color:var(--text2);text-align:left;font-weight:700;text-transform:uppercase;letter-spacing:.4px;">তারিখ</th>
-          <th style="padding:9px 6px;font-size:10px;color:var(--text2);text-align:left;font-weight:700;text-transform:uppercase;letter-spacing:.4px;">ধরন</th>
-          <th style="padding:9px 6px;font-size:10px;color:var(--text2);text-align:left;font-weight:700;text-transform:uppercase;letter-spacing:.4px;">পার্টি</th>
-          <th style="padding:9px 6px;font-size:10px;color:var(--text2);text-align:left;font-weight:700;text-transform:uppercase;letter-spacing:.4px;">পণ্য</th>
-          <th style="padding:9px 6px;font-size:10px;color:var(--text2);text-align:right;font-weight:700;text-transform:uppercase;letter-spacing:.4px;">পরিমাণ</th>
-          <th style="padding:9px 6px;font-size:10px;color:var(--text2);text-align:right;font-weight:700;text-transform:uppercase;letter-spacing:.4px;">মূল্য</th>
-          <th style="padding:9px 6px;font-size:10px;color:var(--text2);text-align:center;font-weight:700;text-transform:uppercase;letter-spacing:.4px;">✏️</th><th style="padding:9px 6px;font-size:10px;color:var(--text2);text-align:center;font-weight:700;text-transform:uppercase;letter-spacing:.4px;">✕</th>
-        </tr>
-      </thead>
+      <thead><tr style="background:var(--surface2);">
+        <th style="padding:9px 10px;font-size:10px;color:var(--text2);text-align:left;font-weight:700;text-transform:uppercase;letter-spacing:.4px;">তারিখ</th>
+        <th style="padding:9px 6px;font-size:10px;color:var(--text2);text-align:left;font-weight:700;text-transform:uppercase;letter-spacing:.4px;">ধরন</th>
+        <th style="padding:9px 6px;font-size:10px;color:var(--text2);text-align:left;font-weight:700;text-transform:uppercase;letter-spacing:.4px;">পার্টি</th>
+        <th style="padding:9px 6px;font-size:10px;color:var(--text2);text-align:left;font-weight:700;text-transform:uppercase;letter-spacing:.4px;">পণ্য</th>
+        <th style="padding:9px 6px;font-size:10px;color:var(--text2);text-align:right;font-weight:700;text-transform:uppercase;letter-spacing:.4px;">পরিমাণ</th>
+        <th style="padding:9px 6px;font-size:10px;color:var(--text2);text-align:right;font-weight:700;text-transform:uppercase;letter-spacing:.4px;">মূল্য</th>
+        <th style="padding:9px 6px;font-size:10px;color:var(--text2);text-align:center;font-weight:700;">✏️</th>
+        <th style="padding:9px 6px;font-size:10px;color:var(--text2);text-align:center;font-weight:700;">✕</th>
+      </tr></thead>
       <tbody>${rows}</tbody>
     </table>
   </div>`;
@@ -1917,6 +1295,12 @@ function fabAct(){
   showPage('transactions');
 }
 
+// ══ LISTENERS ══
+function setupListeners(){
+  renderCart();
+  selType('PURCHASE');
+}
+
 // ══ EXPORT MENU ══
 function exportMenu(){
   openSheet('মেনু',`
@@ -1952,15 +1336,75 @@ function deleteByType(type){
 }
 
 function confirmDelete(type){
-  const doIt=()=>{
+  pwGate(()=>{
     if(type==='transactions'){ state.transactions=[]; }
     else if(type==='payments'){ state.payments=[]; }
     else if(type==='txpay'){ state.transactions=[]; state.payments=[]; }
     else if(type==='all'){ state.transactions=[]; state.payments=[]; state.products=[]; state.variants=[]; state.parties=[]; }
     saveData(); renderAll(); closeSheet();
     toast('ডেটা মুছে গেছে','info');
+  });
+}
+
+// ══ RESET FINANCIAL ══
+function resetFinancial(){
+  pwGate(()=>{
+    openSheet('আর্থিক রিসেট নিশ্চিত করুন',`
+      <div style="text-align:center;padding:12px 0 16px;">
+        <div style="font-size:44px;margin-bottom:12px;">⚠️</div>
+        <div style="font-size:14px;font-weight:700;margin-bottom:8px;">আর্থিক তথ্য শূন্য করবেন?</div>
+        <div style="font-size:12.5px;color:var(--text2);line-height:1.6;">সব লেনদেন ও পেমেন্ট মুছে যাবে।<br>পণ্য ও পার্টি থাকবে।<br><strong style="color:var(--red);">এই কাজ পূর্বাবস্থায় ফেরানো যাবে না।</strong></div>
+      </div>
+      <button class="btn-full btn-danger" style="margin-bottom:8px;" onclick="doResetFinancial()">✅ হ্যাঁ, শূন্য করুন</button>
+      <button class="btn-full btn-ghost" onclick="closeSheet()">বাতিল</button>
+    `);
+  });
+}
+function doResetFinancial(){
+  state.transactions=[];state.payments=[];
+  saveData();renderAll();closeSheet();
+  toast('আর্থিক ডেটা শূন্য করা হয়েছে','info');
+}
+
+// ══ EDIT TRANSACTION ══
+function openEditTx(id){
+  const t=state.transactions.find(x=>x.id===id);if(!t)return;
+  const pr=state.products.find(p=>p.id===t.productId);
+  const vr=state.variants.find(v=>v.id===t.variantId);
+  const pa=state.parties.find(p=>p.id===t.partyId);
+  const typeMap={PURCHASE:'📥 ক্রয়',SALES:'📤 বিক্রয়',RETURN_IN:'↩️ ফেরত আসা',RETURN_OUT:'↪️ ফেরত যাওয়া'};
+  openSheet('লেনদেন সম্পাদনা',`
+    <div style="background:var(--surface2);border-radius:var(--r-sm);padding:11px 13px;margin-bottom:14px;font-size:12.5px;color:var(--text2);">
+      <strong style="color:var(--text);">${esc(pa?.name||'?')}</strong> · ${typeMap[t.type]||t.type}<br>
+      ${esc(pr?.name||'?')} · ${esc(vr?.size||'')} ${vr?.unit||''}
+    </div>
+    <div class="field"><label>তারিখ</label><input id="et-date" type="date" value="${t.date}"></div>
+    <div class="field"><label>পরিমাণ</label><input id="et-qty" type="number" inputmode="decimal" value="${t.qty}" min="0.01" step="0.01"></div>
+    <div class="field"><label>নোট</label><input id="et-note" type="text" value="${esc(t.note||'')}"></div>
+    <div class="field"><label>চালান নং</label><input id="et-inv" type="text" value="${esc(t.invoice||'')}"></div>
+    <div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:var(--r-sm);padding:10px;margin-bottom:14px;font-size:12px;color:var(--yellow);">
+      🔐 মূল্য পরিবর্তনে পাসওয়ার্ড লাগবে
+    </div>
+    <div class="field"><label>একক মূল্য (৳) — পাসওয়ার্ড সংরক্ষিত</label><input id="et-price" type="number" inputmode="decimal" value="${t.price||0}" step="0.01" placeholder="পরিবর্তন করতে পাসওয়ার্ড লাগবে"></div>
+    <button class="btn-full btn-primary" onclick="saveEditTx('${id}')" style="margin-bottom:8px;">💾 সেভ করুন</button>
+    <button class="btn-full btn-ghost" onclick="closeSheet()">বাতিল</button>
+  `);
+}
+
+function saveEditTx(id){
+  const t=state.transactions.find(x=>x.id===id);if(!t)return;
+  const newDate=document.getElementById('et-date').value;
+  const newQty=parseFloat(document.getElementById('et-qty').value);
+  const newNote=document.getElementById('et-note').value.trim();
+  const newInv=document.getElementById('et-inv').value.trim();
+  const newPrice=parseFloat(document.getElementById('et-price').value)||0;
+  if(!newDate||!newQty||newQty<=0){toast('তারিখ ও পরিমাণ দিন','error');return;}
+  const priceChanged=newPrice!==(t.price||0);
+  const doSave=()=>{
+    t.date=newDate;t.qty=newQty;t.note=newNote;t.invoice=newInv;t.price=newPrice;
+    saveData();renderAll();closeSheet();toast('লেনদেন আপডেট হয়েছে ✅','success');
   };
-  pwGate(doIt);
+  if(priceChanged){pwGate(doSave);}else{doSave();}
 }
 
 // ══ PRODUCT SHEETS ══
@@ -2126,12 +1570,6 @@ function delPayment(id){
   saveData();renderAll();toast('পেমেন্ট মুছে গেছে','info');
 }
 
-// ══ LISTENERS ══
-function setupListeners(){
-  renderCart();
-  selType('PURCHASE');
-}
-
 // ══ PDF ══
 function dlTransPDF(){
   const {jsPDF}=window.jspdf;const doc=new jsPDF();
@@ -2187,7 +1625,6 @@ function dlAccountingPDF(){
   doc.text(`Generated: ${new Date().toLocaleString()}`,14,29);
   const stats=getAccStats('','');
   doc.text(`Sales: BDT ${stats.salesAmt.toFixed(2)} | Purchase: BDT ${stats.purchaseAmt.toFixed(2)} | Profit: BDT ${stats.profit.toFixed(2)} | Total Due: BDT ${stats.totalDue.toFixed(2)}`,14,37);
-  // Party ledger
   const rows=state.parties.map(p=>{
     const bal=calcPartyBalance(p.id);
     const txC=state.transactions.filter(t=>t.partyId===p.id).length;
@@ -2212,116 +1649,6 @@ function toast(msg,type='info'){
   wrap.appendChild(el);
   setTimeout(()=>{el.style.opacity='0';el.style.transform='translateY(-6px)';el.style.transition='all .3s';setTimeout(()=>el.remove(),300);},3000);
 }
-
-// ══ LOGIN ══
-const PASS='1811192';
-function checkLogin(){
-  const ok=sessionStorage.getItem('sf_auth')==='1';
-  document.getElementById('login-screen').style.display=ok?'none':'flex';
-  document.querySelector('.top-bar').style.display=ok?'flex':'none';
-  document.getElementById('scroll-area').style.display=ok?'block':'none';
-  document.querySelector('.bottom-nav').style.display=ok?'flex':'none';
-  const fab=document.getElementById('fab');if(fab)fab.style.display=ok?'flex':'none';
-  const sb=document.getElementById('d-sidebar');if(sb&&window.innerWidth>=768)sb.style.display=ok?'flex':'none';
-}
-function doLogin(){
-  const pw=document.getElementById('login-pw').value;
-  if(pw===PASS){
-    sessionStorage.setItem('sf_auth','1');
-    checkLogin();
-    toast('স্বাগতম! ✅','success');
-  } else {
-    document.getElementById('login-err').style.display='block';
-    document.getElementById('login-pw').value='';
-    document.getElementById('login-pw').focus();
-  }
-}
-function doLogout(){
-  sessionStorage.removeItem('sf_auth');
-  checkLogin();
-}
-
-// ══ PASSWORD GATE ══
-function pwGate(callback){
-  openSheet('পাসওয়ার্ড নিশ্চিত করুন',`
-    <div style="text-align:center;margin-bottom:16px;font-size:32px;">🔐</div>
-    <div class="field"><label>পাসওয়ার্ড</label>
-      <input id="gate-pw" type="password" placeholder="••••••••" style="font-size:18px;letter-spacing:4px;text-align:center;"
-        onkeydown="if(event.key==='Enter')checkGate()">
-    </div>
-    <div id="gate-err" style="display:none;color:var(--red);font-size:12px;font-weight:600;text-align:center;margin-bottom:10px;">❌ পাসওয়ার্ড ভুল!</div>
-    <button class="btn-full btn-primary" onclick="checkGate()" style="margin-top:4px;">✅ নিশ্চিত করুন</button>
-    <button class="btn-full btn-ghost" onclick="closeSheet()" style="margin-top:8px;">বাতিল</button>
-  `);
-  window._pwGateCallback=callback;
-}
-function checkGate(){
-  const pw=document.getElementById('gate-pw')?.value||'';
-  if(pw===PASS){closeSheet();if(window._pwGateCallback)window._pwGateCallback();}
-  else{const e=document.getElementById('gate-err');if(e)e.style.display='block';document.getElementById('gate-pw').value='';}
-}
-
-// ══ EDIT TRANSACTION ══
-function openEditTx(id){
-  const t=state.transactions.find(x=>x.id===id);if(!t)return;
-  const pr=state.products.find(p=>p.id===t.productId);
-  const vr=state.variants.find(v=>v.id===t.variantId);
-  const pa=state.parties.find(p=>p.id===t.partyId);
-  const typeMap={PURCHASE:'📥 ক্রয়',SALES:'📤 বিক্রয়',RETURN_IN:'↩️ ফেরত আসা',RETURN_OUT:'↪️ ফেরত যাওয়া'};
-  openSheet('লেনদেন সম্পাদনা',`
-    <div style="background:var(--surface2);border-radius:var(--r-sm);padding:11px 13px;margin-bottom:14px;font-size:12.5px;color:var(--text2);">
-      <strong style="color:var(--text);">${esc(pa?.name||'?')}</strong> · ${typeMap[t.type]||t.type}<br>
-      ${esc(pr?.name||'?')} · ${esc(vr?.size||'')} ${vr?.unit||''}
-    </div>
-    <div class="field"><label>তারিখ</label><input id="et-date" type="date" value="${t.date}"></div>
-    <div class="field"><label>পরিমাণ</label><input id="et-qty" type="number" inputmode="decimal" value="${t.qty}" min="0.01" step="0.01"></div>
-    <div class="field"><label>নোট</label><input id="et-note" type="text" value="${esc(t.note||'')}"></div>
-    <div class="field"><label>চালান নং</label><input id="et-inv" type="text" value="${esc(t.invoice||'')}"></div>
-    <div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:var(--r-sm);padding:10px;margin-bottom:14px;font-size:12px;color:var(--yellow);">
-      🔐 মূল্য পরিবর্তনে পাসওয়ার্ড লাগবে
-    </div>
-    <div class="field"><label>একক মূল্য (৳) — পাসওয়ার্ড সংরক্ষিত</label><input id="et-price" type="number" inputmode="decimal" value="${t.price||0}" step="0.01" placeholder="পরিবর্তন করতে পাসওয়ার্ড লাগবে"></div>
-    <button class="btn-full btn-primary" onclick="saveEditTx('${id}')" style="margin-bottom:8px;">💾 সেভ করুন</button>
-    <button class="btn-full btn-ghost" onclick="closeSheet()">বাতিল</button>
-  `);
-}
-
-function saveEditTx(id){
-  const t=state.transactions.find(x=>x.id===id);if(!t)return;
-  const newDate=document.getElementById('et-date').value;
-  const newQty=parseFloat(document.getElementById('et-qty').value);
-  const newNote=document.getElementById('et-note').value.trim();
-  const newInv=document.getElementById('et-inv').value.trim();
-  const newPrice=parseFloat(document.getElementById('et-price').value)||0;
-  if(!newDate||!newQty||newQty<=0){toast('তারিখ ও পরিমাণ দিন','error');return;}
-  const priceChanged=newPrice!==(t.price||0);
-  const doSave=()=>{
-    t.date=newDate;t.qty=newQty;t.note=newNote;t.invoice=newInv;t.price=newPrice;
-    saveData();renderAll();closeSheet();toast('লেনদেন আপডেট হয়েছে ✅','success');
-  };
-  if(priceChanged){pwGate(doSave);}else{doSave();}
-}
-
-// ══ RESET FINANCIAL ══
-function resetFinancial(){
-  pwGate(()=>{
-    openSheet('আর্থিক রিসেট নিশ্চিত করুন',`
-      <div style="text-align:center;padding:12px 0 16px;">
-        <div style="font-size:44px;margin-bottom:12px;">⚠️</div>
-        <div style="font-size:14px;font-weight:700;margin-bottom:8px;">আর্থিক তথ্য শূন্য করবেন?</div>
-        <div style="font-size:12.5px;color:var(--text2);line-height:1.6;">সব লেনদেন ও পেমেন্ট মুছে যাবে।<br>পণ্য ও পার্টি থাকবে।<br><strong style="color:var(--red);">এই কাজ পূর্বাবস্থায় ফেরানো যাবে না।</strong></div>
-      </div>
-      <button class="btn-full btn-danger" style="margin-bottom:8px;" onclick="doResetFinancial()">✅ হ্যাঁ, শূন্য করুন</button>
-      <button class="btn-full btn-ghost" onclick="closeSheet()">বাতিল</button>
-    `);
-  });
-}
-function doResetFinancial(){
-  state.transactions=[];state.payments=[];
-  saveData();renderAll();closeSheet();
-  toast('আর্থিক ডেটা শূন্য করা হয়েছে','info');
-}
-
 </script>
 </body>
 </html>
