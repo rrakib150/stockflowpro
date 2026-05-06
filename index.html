@@ -41,8 +41,8 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);-webk
 /* BOTTOM NAV */
 .bottom-nav{position:fixed;bottom:0;left:0;right:0;height:var(--nav-h);background:var(--surface);border-top:1px solid var(--border);display:flex;align-items:stretch;z-index:300;}
 .nav-tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;cursor:pointer;position:relative;padding:4px 1px 6px;}
-.nav-tab .t-icon{font-size:17px;transition:transform .2s cubic-bezier(.34,1.56,.64,1);}
-.nav-tab .t-lbl{font-size:8.5px;font-weight:600;color:var(--text3);transition:color .15s;}
+.nav-tab .t-icon{font-size:15px;transition:transform .2s cubic-bezier(.34,1.56,.64,1);}
+.nav-tab .t-lbl{font-size:7.5px;font-weight:600;color:var(--text3);transition:color .15s;}
 .nav-tab.active .t-icon{transform:scale(1.1);}
 .nav-tab.active .t-lbl{color:var(--accent);}
 .nav-tab.active::before{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:28px;height:3px;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:0 0 3px 3px;}
@@ -348,7 +348,10 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);-webk
 
 <!-- ═══ PRODUCTS ═══ -->
 <div class="page" id="pg-products">
-  <div style="margin-bottom:14px;"><div style="font-size:20px;font-weight:800;">পণ্য 🏷️</div><div style="font-size:12px;color:var(--text2);margin-top:2px;">ক্যাটালগ ও ভেরিয়েন্ট পরিচালনা</div></div>
+  <div style="margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;">
+    <div><div style="font-size:20px;font-weight:800;">পণ্য 🏷️</div><div style="font-size:12px;color:var(--text2);margin-top:2px;">ক্যাটালগ ও ভেরিয়েন্ট পরিচালনা</div></div>
+    <button class="ibt ibt-a" style="width:auto;padding:0 14px;font-size:13px;font-weight:700;border-radius:20px;height:36px;" onclick="openAddProd()">＋ নতুন পণ্য</button>
+  </div>
   <div class="search-bar"><span class="s-ico">🔍</span><input type="text" id="prod-search" placeholder="পণ্য খুঁজুন…" oninput="renderProducts()"></div>
   <div id="prod-list"></div>
 </div>
@@ -375,7 +378,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);-webk
       <div class="tp" data-v="RETURN_OUT" onclick="selType('RETURN_OUT')">↪️<br>ফেরত যাওয়া</div>
     </div>
     <div class="field"><label>পার্টি</label><select id="trans-party" onchange="onPartyChange()"><option value="">— পার্টি বেছে নিন —</option></select></div>
-    <div id="party-bal-box" style="display:none;background:var(--surface2);border-radius:var(--r-sm);padding:10px 13px;margin-bottom:12px;font-size:12px;color:var(--text2);display:flex;align-items:center;justify-content:space-between;">
+    <div id="party-bal-box" style="display:none;background:var(--surface2);border-radius:var(--r-sm);padding:10px 13px;margin-bottom:12px;font-size:12px;color:var(--text2);align-items:center;justify-content:space-between;">
       <span>বর্তমান বকেয়া:</span><strong id="party-bal-val" style="font-family:'JetBrains Mono',monospace;"></strong>
     </div>
     <div class="field-2">
@@ -537,6 +540,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);-webk
 <!-- BOTTOM NAV -->
 <div class="bottom-nav">
   <div class="nav-tab active" data-p="dashboard" onclick="showPage('dashboard')"><span class="t-icon">📊</span><span class="t-lbl">হোম</span></div>
+  <div class="nav-tab" data-p="products" onclick="showPage('products')"><span class="t-icon">🏷️</span><span class="t-lbl">পণ্য</span></div>
   <div class="nav-tab" data-p="parties" onclick="showPage('parties')"><span class="t-icon">🤝</span><span class="t-lbl">পার্টি</span></div>
   <div class="nav-tab" data-p="transactions" onclick="showPage('transactions')"><span class="t-icon">🔄</span><span class="t-lbl">লেনদেন</span></div>
   <div class="nav-tab" data-p="clinic" onclick="showPage('clinic')"><span class="t-icon">🏥</span><span class="t-lbl">রোগি</span></div>
