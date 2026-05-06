@@ -40,9 +40,9 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);-webk
 
 /* BOTTOM NAV */
 .bottom-nav{position:fixed;bottom:0;left:0;right:0;height:var(--nav-h);background:var(--surface);border-top:1px solid var(--border);display:flex;align-items:stretch;z-index:300;}
-.nav-tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;position:relative;padding:6px 2px 8px;}
-.nav-tab .t-icon{font-size:19px;transition:transform .2s cubic-bezier(.34,1.56,.64,1);}
-.nav-tab .t-lbl{font-size:9.5px;font-weight:600;color:var(--text3);transition:color .15s;}
+.nav-tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;cursor:pointer;position:relative;padding:4px 1px 6px;}
+.nav-tab .t-icon{font-size:17px;transition:transform .2s cubic-bezier(.34,1.56,.64,1);}
+.nav-tab .t-lbl{font-size:8.5px;font-weight:600;color:var(--text3);transition:color .15s;}
 .nav-tab.active .t-icon{transform:scale(1.1);}
 .nav-tab.active .t-lbl{color:var(--accent);}
 .nav-tab.active::before{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:28px;height:3px;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:0 0 3px 3px;}
@@ -303,6 +303,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);-webk
   <div class="d-item" data-p="parties"><span class="d-ico">🤝</span>পার্টি</div>
   <div class="d-item" data-p="transactions"><span class="d-ico">🔄</span>লেনদেন</div>
   <div class="d-item" data-p="accounting"><span class="d-ico">💰</span>হিসাব</div>
+  <div class="d-item" data-p="clinic"><span class="d-ico">🏥</span>রোগি হিসাব</div>
   <div class="d-item" data-p="history"><span class="d-ico">📋</span>ইতিহাস</div>
   <div class="d-bot">
     <div class="d-sum">
@@ -354,7 +355,10 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);-webk
 
 <!-- ═══ PARTIES ═══ -->
 <div class="page" id="pg-parties">
-  <div style="margin-bottom:14px;"><div style="font-size:20px;font-weight:800;">পার্টি 🤝</div><div style="font-size:12px;color:var(--text2);margin-top:2px;">সরবরাহকারী ও গ্রাহক</div></div>
+  <div style="margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;">
+    <div><div style="font-size:20px;font-weight:800;">পার্টি 🤝</div><div style="font-size:12px;color:var(--text2);margin-top:2px;">সরবরাহকারী ও গ্রাহক</div></div>
+    <button class="ibt ibt-a" style="width:auto;padding:0 14px;font-size:13px;font-weight:700;border-radius:20px;height:36px;" onclick="openAddPty()">＋ নতুন পার্টি</button>
+  </div>
   <div class="search-bar"><span class="s-ico">🔍</span><input type="text" id="party-search" placeholder="পার্টি খুঁজুন…" oninput="renderParties()"></div>
   <div id="party-list"></div>
 </div>
@@ -486,6 +490,45 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);-webk
   <div id="stock-list"></div>
 </div>
 
+
+<!-- ═══ CLINIC ═══ -->
+<div class="page" id="pg-clinic">
+  <div style="margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;">
+    <div><div style="font-size:20px;font-weight:800;">রোগি হিসাব 🏥</div><div style="font-size:12px;color:var(--text2);margin-top:2px;">প্রতিদিনের আয় ও ব্যয়</div></div>
+  </div>
+
+  <!-- Summary Cards -->
+  <div class="stat-grid" style="margin-bottom:12px;">
+    <div class="stat-card sc-g"><div class="sc-icon">💵</div><div class="sc-lbl">মোট আয়</div><div class="sc-val" id="cl-total-income" style="font-size:20px;">৳০</div><div class="sc-sub" id="cl-income-sub">সব সময়</div></div>
+    <div class="stat-card sc-r"><div class="sc-icon">💸</div><div class="sc-lbl">মোট ব্যয়</div><div class="sc-val" id="cl-total-expense" style="font-size:20px;">৳০</div><div class="sc-sub" id="cl-expense-sub">সব সময়</div></div>
+    <div class="stat-card sc-b"><div class="sc-icon">🏥</div><div class="sc-lbl">মোট রোগি</div><div class="sc-val" id="cl-total-patients">০</div><div class="sc-sub">এন্ট্রি সংখ্যা</div></div>
+    <div class="stat-card sc-p"><div class="sc-icon">📈</div><div class="sc-lbl">নেট লাভ</div><div class="sc-val" id="cl-net-profit" style="font-size:20px;">৳০</div><div class="sc-sub" id="cl-profit-color">আয় − ব্যয়</div></div>
+  </div>
+
+  <!-- Date Filter -->
+  <div class="date-row" style="margin-bottom:10px;">
+    <input type="date" id="cl-ds" onchange="renderClinic()">
+    <input type="date" id="cl-de" onchange="renderClinic()">
+  </div>
+  <div style="display:flex;gap:8px;margin-bottom:14px;overflow-x:auto;padding-bottom:2px;">
+    <button class="chip active" onclick="setClinicPeriod('today',this)">আজ</button>
+    <button class="chip" onclick="setClinicPeriod('week',this)">এই সপ্তাহ</button>
+    <button class="chip" onclick="setClinicPeriod('month',this)">এই মাস</button>
+    <button class="chip" onclick="setClinicPeriod('all',this)">সব</button>
+  </div>
+
+  <!-- Add Entry Button -->
+  <button class="btn-full btn-primary" onclick="openAddClinicEntry()" style="margin-bottom:14px;">➕ নতুন এন্ট্রি যোগ করুন</button>
+
+  <!-- Daily Summary Chart -->
+  <div class="chart-card" id="cl-chart-wrap" style="display:none;"><div class="ch-title">📊 দৈনিক আয়-ব্যয়</div><div style="height:180px;position:relative;"><canvas id="clinicChart"></canvas></div></div>
+
+  <!-- List -->
+  <div class="divider">📋 এন্ট্রির তালিকা</div>
+  <div class="search-bar"><span class="s-ico">🔍</span><input type="text" id="cl-search" placeholder="রোগির নাম বা বিবরণ খুঁজুন…" oninput="renderClinic()"></div>
+  <div id="clinic-list"></div>
+</div>
+
 </div><!-- /scroll-area -->
 
 <!-- FAB -->
@@ -494,8 +537,9 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);-webk
 <!-- BOTTOM NAV -->
 <div class="bottom-nav">
   <div class="nav-tab active" data-p="dashboard" onclick="showPage('dashboard')"><span class="t-icon">📊</span><span class="t-lbl">হোম</span></div>
-  <div class="nav-tab" data-p="products" onclick="showPage('products')"><span class="t-icon">🏷️</span><span class="t-lbl">পণ্য</span></div>
+  <div class="nav-tab" data-p="parties" onclick="showPage('parties')"><span class="t-icon">🤝</span><span class="t-lbl">পার্টি</span></div>
   <div class="nav-tab" data-p="transactions" onclick="showPage('transactions')"><span class="t-icon">🔄</span><span class="t-lbl">লেনদেন</span></div>
+  <div class="nav-tab" data-p="clinic" onclick="showPage('clinic')"><span class="t-icon">🏥</span><span class="t-lbl">রোগি</span></div>
   <div class="nav-tab" data-p="accounting" onclick="showPage('accounting')"><span class="t-icon">💰</span><span class="t-lbl">হিসাব</span></div>
   <div class="nav-tab" data-p="history" onclick="showPage('history')"><span class="t-icon">📋</span><span class="t-lbl">ইতিহাস</span><span class="n-badge" id="low-badge">0</span></div>
 </div>
@@ -540,7 +584,7 @@ const db = firebase.database();
 const DB_REF = db.ref('stockflow');
 
 // ══ STATE ══
-let state={products:[],variants:[],parties:[],transactions:[],payments:[]};
+let state={products:[],variants:[],parties:[],transactions:[],payments:[],clinicEntries:[]};
 let sChart=null,tChart=null,pChart=null,curPage='dashboard',selTxType='PURCHASE';
 let hTF='',hPF='',ledgerFilter='all';
 const LOW=5;
@@ -558,7 +602,8 @@ document.addEventListener('DOMContentLoaded',()=>{
         variants:   data.variants    ? Object.values(data.variants)    : [],
         parties:    data.parties     ? Object.values(data.parties)     : [],
         transactions: data.transactions ? Object.values(data.transactions) : [],
-        payments:   data.payments    ? Object.values(data.payments)    : []
+        payments:   data.payments    ? Object.values(data.payments)    : [],
+        clinicEntries: data.clinicEntries ? Object.values(data.clinicEntries) : []
       };
     } else {
       try{const s=localStorage.getItem('sf_mob2');if(s){const old=JSON.parse(s);state={...state,...old};saveData();toast('লোকাল ডেটা Firebase এ সরানো হয়েছে 🎉','success');}}catch(e){}
@@ -574,6 +619,9 @@ document.addEventListener('DOMContentLoaded',()=>{
     const y=now.getFullYear(),m=String(now.getMonth()+1).padStart(2,'0');
     document.getElementById('acc-ds').value=`${y}-${m}-01`;
     document.getElementById('acc-de').value=today();
+    document.getElementById('cl-ds').value=today();
+    document.getElementById('cl-de').value=today();
+    renderClinic();
   },(err)=>{
     showLoading(false);
     toast('Firebase সংযোগ ত্রুটি: '+err.message,'error');
@@ -671,6 +719,197 @@ function checkGate(){
   else{const e=document.getElementById('gate-err');if(e)e.style.display='block';document.getElementById('gate-pw').value='';}
 }
 
+
+// ══ CLINIC ══
+let clinicChart=null;
+
+function setClinicPeriod(period,el){
+  document.querySelectorAll('#pg-clinic .chip').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');
+  const now=new Date(),y=now.getFullYear(),m=now.getMonth();
+  if(period==='today'){document.getElementById('cl-ds').value=today();document.getElementById('cl-de').value=today();}
+  else if(period==='week'){const d=new Date(now);d.setDate(d.getDate()-6);document.getElementById('cl-ds').value=d.toISOString().split('T')[0];document.getElementById('cl-de').value=today();}
+  else if(period==='month'){document.getElementById('cl-ds').value=`${y}-${String(m+1).padStart(2,'0')}-01`;document.getElementById('cl-de').value=today();}
+  else{document.getElementById('cl-ds').value='';document.getElementById('cl-de').value='';}
+  renderClinic();
+}
+
+function openAddClinicEntry(){
+  openSheet('নতুন এন্ট্রি যোগ করুন',`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+      <div class="tp" data-cv="income" onclick="selClinicType('income',this)" style="background:rgba(16,185,129,.12);border-color:var(--green);color:var(--green);">💵<br>আয়</div>
+      <div class="tp" data-cv="expense" onclick="selClinicType('expense',this)">💸<br>ব্যয়</div>
+    </div>
+    <div class="field"><label>তারিখ</label><input id="ce-date" type="date" value="${today()}"></div>
+    <div class="field"><label>রোগির সংখ্যা (ঐচ্ছিক)</label><input id="ce-patients" type="number" inputmode="numeric" placeholder="০" min="0"></div>
+    <div class="field"><label>পরিমাণ (৳)</label><input id="ce-amount" type="number" inputmode="decimal" placeholder="০.০০" min="0" step="0.01"></div>
+    <div class="field"><label>বিবরণ</label><input id="ce-desc" type="text" placeholder="যেমন: ভিজিট ফি, ওষুধ খরচ…"></div>
+    <input type="hidden" id="ce-type" value="income">
+    <button class="btn-full btn-primary" onclick="saveClinicEntry()" style="margin-top:4px;">✅ এন্ট্রি সেভ করুন</button>
+  `);
+}
+
+function selClinicType(type,el){
+  document.getElementById('ce-type').value=type;
+  document.querySelectorAll('[data-cv]').forEach(t=>{
+    t.className='tp';
+    if(t.dataset.cv==='income') t.style.cssText='';
+    else t.style.cssText='';
+  });
+  if(type==='income'){el.style.cssText='background:rgba(16,185,129,.12);border-color:var(--green);color:var(--green);';}
+  else{el.style.cssText='background:rgba(239,68,68,.12);border-color:var(--red);color:var(--red);';}
+}
+
+function saveClinicEntry(){
+  const date=document.getElementById('ce-date').value;
+  const amount=parseFloat(document.getElementById('ce-amount').value);
+  const desc=document.getElementById('ce-desc').value.trim();
+  const type=document.getElementById('ce-type').value;
+  const patients=parseInt(document.getElementById('ce-patients').value)||0;
+  if(!date){toast('তারিখ দিন','error');return;}
+  if(!amount||amount<=0){toast('পরিমাণ দিন','error');return;}
+  if(!state.clinicEntries) state.clinicEntries=[];
+  state.clinicEntries.push({id:gid(),date,amount,desc,type,patients,timestamp:Date.now()});
+  saveData();renderClinic();closeSheet();
+  toast(type==='income'?'আয় যোগ হয়েছে ✅':'ব্যয় যোগ হয়েছে ✅','success');
+}
+
+function delClinicEntry(id){
+  if(!confirm('এই এন্ট্রি মুছবেন?'))return;
+  state.clinicEntries=state.clinicEntries.filter(e=>e.id!==id);
+  saveData();renderClinic();toast('এন্ট্রি মুছে গেছে','info');
+}
+
+function openEditClinicEntry(id){
+  const e=state.clinicEntries.find(x=>x.id===id);if(!e)return;
+  openSheet('এন্ট্রি সম্পাদনা',`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+      <div class="tp" data-cv="income" onclick="selClinicType('income',this)" style="${e.type==='income'?'background:rgba(16,185,129,.12);border-color:var(--green);color:var(--green);':''}">💵<br>আয়</div>
+      <div class="tp" data-cv="expense" onclick="selClinicType('expense',this)" style="${e.type==='expense'?'background:rgba(239,68,68,.12);border-color:var(--red);color:var(--red);':''}">💸<br>ব্যয়</div>
+    </div>
+    <div class="field"><label>তারিখ</label><input id="ce-date" type="date" value="${e.date}"></div>
+    <div class="field"><label>রোগির সংখ্যা</label><input id="ce-patients" type="number" inputmode="numeric" value="${e.patients||0}" min="0"></div>
+    <div class="field"><label>পরিমাণ (৳)</label><input id="ce-amount" type="number" inputmode="decimal" value="${e.amount}" min="0" step="0.01"></div>
+    <div class="field"><label>বিবরণ</label><input id="ce-desc" type="text" value="${esc(e.desc||'')}"></div>
+    <input type="hidden" id="ce-type" value="${e.type}">
+    <button class="btn-full btn-primary" onclick="updateClinicEntry('${id}')" style="margin-bottom:8px;">💾 আপডেট করুন</button>
+    <button class="btn-full btn-ghost" onclick="closeSheet()">বাতিল</button>
+  `);
+}
+
+function updateClinicEntry(id){
+  const e=state.clinicEntries.find(x=>x.id===id);if(!e)return;
+  e.date=document.getElementById('ce-date').value;
+  e.amount=parseFloat(document.getElementById('ce-amount').value)||0;
+  e.desc=document.getElementById('ce-desc').value.trim();
+  e.type=document.getElementById('ce-type').value;
+  e.patients=parseInt(document.getElementById('ce-patients').value)||0;
+  saveData();renderClinic();closeSheet();toast('এন্ট্রি আপডেট হয়েছে ✅','success');
+}
+
+function renderClinic(){
+  if(!state.clinicEntries) state.clinicEntries=[];
+  const ds=document.getElementById('cl-ds')?.value||'';
+  const de=document.getElementById('cl-de')?.value||'';
+  const q=(document.getElementById('cl-search')?.value||'').toLowerCase();
+
+  let entries=[...state.clinicEntries].filter(e=>{
+    if(ds&&e.date<ds)return false;
+    if(de&&e.date>de)return false;
+    if(q&&!(e.desc||'').toLowerCase().includes(q))return false;
+    return true;
+  }).sort((a,b)=>b.date.localeCompare(a.date)||b.timestamp-a.timestamp);
+
+  const totalIncome=entries.filter(e=>e.type==='income').reduce((s,e)=>s+e.amount,0);
+  const totalExpense=entries.filter(e=>e.type==='expense').reduce((s,e)=>s+e.amount,0);
+  const totalPatients=entries.filter(e=>e.type==='income').reduce((s,e)=>s+(e.patients||0),0);
+  const netProfit=totalIncome-totalExpense;
+
+  document.getElementById('cl-total-income').textContent=fmt(totalIncome);
+  document.getElementById('cl-total-expense').textContent=fmt(totalExpense);
+  document.getElementById('cl-total-patients').textContent=totalPatients;
+  document.getElementById('cl-net-profit').textContent=fmt(netProfit);
+  document.getElementById('cl-net-profit').style.color=netProfit>=0?'var(--green)':'var(--red)';
+
+  // Chart — last 7 days
+  const days=[];const incD=[];const expD=[];
+  for(let i=6;i>=0;i--){
+    const d=new Date();d.setDate(d.getDate()-i);
+    const ds2=d.toISOString().split('T')[0];
+    days.push(d.toLocaleDateString('bn-BD',{day:'numeric',month:'short'}));
+    const dayE=state.clinicEntries.filter(e=>e.date===ds2);
+    incD.push(dayE.filter(e=>e.type==='income').reduce((s,e)=>s+e.amount,0));
+    expD.push(dayE.filter(e=>e.type==='expense').reduce((s,e)=>s+e.amount,0));
+  }
+  const cw=document.getElementById('cl-chart-wrap');
+  if(cw) cw.style.display=state.clinicEntries.length?'block':'none';
+  if(clinicChart) clinicChart.destroy();
+  const cc=document.getElementById('clinicChart');
+  if(cc && state.clinicEntries.length){
+    clinicChart=new Chart(cc.getContext('2d'),{type:'bar',
+      data:{labels:days,datasets:[
+        {label:'আয়',data:incD,backgroundColor:'rgba(16,185,129,.75)',borderRadius:5},
+        {label:'ব্যয়',data:expD,backgroundColor:'rgba(239,68,68,.6)',borderRadius:5}
+      ]},
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{position:'top',labels:{color:'#8b90a7',font:{size:10},boxWidth:10}}},
+        scales:{x:{ticks:{color:'#8b90a7',font:{size:9}},grid:{display:false}},
+                y:{beginAtZero:true,ticks:{color:'#8b90a7',font:{size:9},callback:v=>'৳'+v},grid:{color:'rgba(255,255,255,.06)'}}}}
+    });
+  }
+
+  // Group by date for display
+  const byDate={};
+  entries.forEach(e=>{if(!byDate[e.date])byDate[e.date]=[];byDate[e.date].push(e);});
+
+  const el=document.getElementById('clinic-list');
+  if(!entries.length){
+    el.innerHTML=`<div class="empty"><div class="e-ico">🏥</div><p>কোনো এন্ট্রি নেই</p><small>➕ বাটন চাপুন নতুন এন্ট্রি যোগ করতে</small></div>`;
+    return;
+  }
+
+  el.innerHTML=Object.keys(byDate).sort((a,b)=>b.localeCompare(a)).map(date=>{
+    const dayEntries=byDate[date];
+    const dayIncome=dayEntries.filter(e=>e.type==='income').reduce((s,e)=>s+e.amount,0);
+    const dayExpense=dayEntries.filter(e=>e.type==='expense').reduce((s,e)=>s+e.amount,0);
+    const dayPatients=dayEntries.filter(e=>e.type==='income').reduce((s,e)=>s+(e.patients||0),0);
+    const dayNet=dayIncome-dayExpense;
+    const d=new Date(date);
+    const dateLabel=d.toLocaleDateString('bn-BD',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+
+    const rows=dayEntries.map(e=>`
+      <div style="display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--border);">
+        <div style="width:34px;height:34px;border-radius:9px;background:${e.type==='income'?'rgba(16,185,129,.12)':'rgba(239,68,68,.12)'};display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">${e.type==='income'?'💵':'💸'}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(e.desc||'কোনো বিবরণ নেই')}</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:2px;">${e.type==='income'?'আয়':'ব্যয়'}${e.patients?` · ${e.patients} রোগি`:''}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0;">
+          <div style="font-size:14px;font-weight:800;font-family:'JetBrains Mono',monospace;color:${e.type==='income'?'var(--green)':'var(--red)'};">${e.type==='income'?'+':'-'}${fmt(e.amount)}</div>
+          <div style="display:flex;gap:4px;margin-top:4px;justify-content:flex-end;">
+            <button class="ibt ibt-e" onclick="openEditClinicEntry('${e.id}')">✏️</button>
+            <button class="ibt ibt-d" onclick="delClinicEntry('${e.id}')">✕</button>
+          </div>
+        </div>
+      </div>`).join('');
+
+    return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--r);margin-bottom:12px;overflow:hidden;">
+      <div style="padding:10px 14px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div style="font-size:12.5px;font-weight:700;">${dateLabel}</div>
+          ${dayPatients?`<div style="font-size:11px;color:var(--text2);margin-top:2px;">🏥 ${dayPatients} জন রোগি</div>`:''}
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:11px;color:var(--green);font-weight:600;">আয়: ${fmt(dayIncome)}</div>
+          <div style="font-size:11px;color:var(--red);font-weight:600;">ব্যয়: ${fmt(dayExpense)}</div>
+          <div style="font-size:12px;font-weight:800;color:${dayNet>=0?'var(--accent)':'var(--red)'};">নেট: ${fmt(dayNet)}</div>
+        </div>
+      </div>
+      ${rows}
+    </div>`;
+  }).join('');
+}
+
 // ══ SAVE DATA ══
 function saveData(){
   if(_fbSaveTimeout)clearTimeout(_fbSaveTimeout);
@@ -680,7 +919,8 @@ function saveData(){
       variants:     state.variants.reduce((o,x)=>{o[x.id]=x;return o;},{}),
       parties:      state.parties.reduce((o,x)=>{o[x.id]=x;return o;},{}),
       transactions: state.transactions.reduce((o,x)=>{o[x.id]=x;return o;},{}),
-      payments:     state.payments.reduce((o,x)=>{o[x.id]=x;return o;},{})
+      payments:     state.payments.reduce((o,x)=>{o[x.id]=x;return o;},{}),
+      clinicEntries: (state.clinicEntries||[]).reduce((o,x)=>{o[x.id]=x;return o},{})
     };
     DB_REF.set(fbData).catch(err=>{
       toast('সেভ ত্রুটি: '+err.message,'error');
@@ -703,6 +943,7 @@ function showPage(p){
   if(p==='dashboard')renderDashboard();
   if(p==='history'){renderHistory();renderStock();}
   if(p==='accounting'){renderAccounting();renderLedger();renderPayments();}
+  if(p==='clinic')renderClinic();
 }
 
 // ══ STOCK CALC ══
@@ -750,7 +991,7 @@ function getAccStats(ds,de){
 }
 
 // ══ RENDER ALL ══
-function renderAll(){renderDashboard();renderProducts();renderParties();renderDropdowns();renderHistory();renderStock();renderAccounting();renderLedger();renderPayments();updateSidebar();}
+function renderAll(){renderDashboard();renderProducts();renderParties();renderDropdowns();renderHistory();renderStock();renderAccounting();renderLedger();renderPayments();renderClinic();updateSidebar();}
 
 function updateSidebar(){
   let tot=0,low=0;
@@ -896,19 +1137,109 @@ function renderParties(){
     const bal=calcPartyBalance(p.id);
     const txC=state.transactions.filter(t=>t.partyId===p.id).length;
     const balStr=bal>0?`<span style="color:var(--red);">পাওনা ${fmt(bal)}</span>`:bal<0?`<span style="color:var(--yellow);">দেনা ${fmt(-bal)}</span>`:`<span style="color:var(--green);">নিষ্পত্তি</span>`;
-    return `<div class="party-card">
-      <div class="pty-ava" style="background:${sup?'rgba(6,182,212,.15)':'rgba(124,58,237,.15)'};">${sup?'🏭':'🛒'}</div>
-      <div style="flex:1;min-width:0;">
-        <div style="font-size:14px;font-weight:700;">${esc(p.name)}</div>
-        <div style="font-size:11.5px;color:var(--text2);margin-top:2px;">${esc(p.contact||'কোনো যোগাযোগ নেই')} · ${txC} লেনদেন · ${balStr}</div>
+    return `<div class="party-card" style="flex-direction:column;align-items:stretch;gap:0;padding:0;overflow:hidden;">
+      <div style="display:flex;align-items:center;padding:12px 14px;gap:12px;">
+        <div class="pty-ava" style="background:${sup?'rgba(6,182,212,.15)':'rgba(124,58,237,.15)'};">${sup?'🏭':'🛒'}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:14px;font-weight:700;">${esc(p.name)}</div>
+          <div style="font-size:11.5px;color:var(--text2);margin-top:2px;">${esc(p.contact||'কোনো যোগাযোগ নেই')} · ${txC} লেনদেন · ${balStr}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span class="badge ${sup?'b-supplier':'b-customer'}">${sup?'সরবরাহকারী':'গ্রাহক'}</span>
+          <button class="ibt ibt-e" onclick="openEditPty('${p.id}')">✏️</button>
+          <button class="ibt ibt-d" onclick="delPty('${p.id}')">🗑️</button>
+        </div>
       </div>
-      <div style="display:flex;align-items:center;gap:6px;">
-        <span class="badge ${sup?'b-supplier':'b-customer'}">${sup?'সরবরাহকারী':'গ্রাহক'}</span>
-        <button class="ibt ibt-e" onclick="openEditPty('${p.id}')">✏️</button>
-        <button class="ibt ibt-d" onclick="delPty('${p.id}')">🗑️</button>
+      <div style="border-top:1px solid var(--border);padding:8px 14px 12px;">
+        <button onclick="openPartyLedger('${p.id}')" style="width:100%;padding:9px;background:rgba(79,110,247,.1);border:1.5px solid rgba(79,110,247,.25);border-radius:var(--r-sm);font-size:12.5px;font-weight:700;color:var(--accent);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+          📦 মালের বিবরণ দেখুন
+        </button>
       </div>
     </div>`;
   }).join('');
+}
+
+function openPartyLedger(partyId){
+  const party=state.parties.find(p=>p.id===partyId);
+  if(!party) return;
+  const txs=state.transactions.filter(t=>t.partyId===partyId).sort((a,b)=>b.date.localeCompare(a.date)||b.timestamp-a.timestamp);
+
+  // Group by product+variant
+  const summary={};
+  txs.forEach(t=>{
+    const key=t.productId+'_'+t.variantId;
+    if(!summary[key]) summary[key]={productId:t.productId,variantId:t.variantId,purchase:0,sales:0,returnIn:0,returnOut:0};
+    if(t.type==='PURCHASE') summary[key].purchase+=Number(t.qty)||0;
+    else if(t.type==='SALES') summary[key].sales+=Number(t.qty)||0;
+    else if(t.type==='RETURN_IN') summary[key].returnIn+=Number(t.qty)||0;
+    else if(t.type==='RETURN_OUT') summary[key].returnOut+=Number(t.qty)||0;
+  });
+
+  const sumRows=Object.values(summary).map(s=>{
+    const pr=state.products.find(p=>p.id===s.productId);
+    const vr=state.variants.find(v=>v.id===s.variantId);
+    const net=(s.purchase+s.returnIn)-(s.sales+s.returnOut);
+    const rows=[];
+    if(s.purchase>0) rows.push(`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px;"><span style="color:var(--green);">📥 ক্রয়</span><span style="font-weight:700;color:var(--green);">+${s.purchase} ${vr?.unit||''}</span></div>`);
+    if(s.sales>0) rows.push(`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px;"><span style="color:var(--red);">📤 বিক্রয়</span><span style="font-weight:700;color:var(--red);">−${s.sales} ${vr?.unit||''}</span></div>`);
+    if(s.returnIn>0) rows.push(`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px;"><span style="color:var(--accent);">↩️ ফেরত আসা</span><span style="font-weight:700;color:var(--accent);">+${s.returnIn} ${vr?.unit||''}</span></div>`);
+    if(s.returnOut>0) rows.push(`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px;"><span style="color:var(--yellow);">↪️ ফেরত যাওয়া</span><span style="font-weight:700;color:var(--yellow);">−${s.returnOut} ${vr?.unit||''}</span></div>`);
+    return `<div style="background:var(--surface2);border-radius:var(--r-sm);padding:12px;margin-bottom:10px;">
+      <div style="font-size:13.5px;font-weight:800;margin-bottom:8px;">📦 ${esc(pr?.name||'?')} <span style="font-size:11px;color:var(--text2);font-weight:500;">· ${esc(vr?.size||'')} (${vr?.unit||''})</span></div>
+      ${rows.join('')}
+      <div style="display:flex;justify-content:space-between;padding-top:8px;margin-top:4px;">
+        <span style="font-size:12px;font-weight:700;color:var(--text2);">নেট পরিমাণ</span>
+        <span style="font-size:14px;font-weight:800;font-family:'JetBrains Mono',monospace;color:${net>=0?'var(--green)':'var(--red)'};">${net>=0?'+':''}${net} ${vr?.unit||''}</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Recent transactions
+  const recentRows=txs.slice(0,10).map(t=>{
+    const pr=state.products.find(p=>p.id===t.productId);
+    const vr=state.variants.find(v=>v.id===t.variantId);
+    const IC={PURCHASE:{i:'📥',c:'var(--green)',lbl:'ক্রয়',s:'+'},SALES:{i:'📤',c:'var(--red)',lbl:'বিক্রয়',s:'−'},RETURN_IN:{i:'↩️',c:'var(--accent)',lbl:'ফেরত আসা',s:'+'},RETURN_OUT:{i:'↪️',c:'var(--yellow)',lbl:'ফেরত যাওয়া',s:'−'}};
+    const ic=IC[t.type]||{i:'📦',c:'var(--text2)',lbl:t.type,s:''};
+    const total=(Number(t.price)||0)*(Number(t.qty)||0);
+    return `<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);">
+      <span style="font-size:18px;">${ic.i}</span>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:12.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(pr?.name||'?')} · ${esc(vr?.size||'')}</div>
+        <div style="font-size:11px;color:var(--text2);">${t.date} · ${ic.lbl}${total>0?' · '+fmt(total):''}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0;">
+        <div style="font-size:14px;font-weight:800;font-family:'JetBrains Mono',monospace;color:${ic.c};">${ic.s}${t.qty}</div>
+        <div style="font-size:10px;color:var(--text2);">${vr?.unit||''}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const bal=calcPartyBalance(partyId);
+  const totalBusiness=txs.reduce((s,t)=>s+(Number(t.price)||0)*(Number(t.qty)||0),0);
+  const sup=party.type==='Supplier';
+
+  openSheet(`${party.name} — মালের বিবরণ`,`
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px;">
+      <div style="background:var(--surface2);border-radius:var(--r-sm);padding:10px;text-align:center;">
+        <div style="font-size:10px;color:var(--text2);font-weight:700;text-transform:uppercase;">লেনদেন</div>
+        <div style="font-size:20px;font-weight:800;margin-top:4px;">${txs.length}</div>
+      </div>
+      <div style="background:var(--surface2);border-radius:var(--r-sm);padding:10px;text-align:center;">
+        <div style="font-size:10px;color:var(--text2);font-weight:700;text-transform:uppercase;">মোট ব্যবসা</div>
+        <div style="font-size:14px;font-weight:800;margin-top:4px;color:var(--accent);">${fmt(totalBusiness)}</div>
+      </div>
+      <div style="background:var(--surface2);border-radius:var(--r-sm);padding:10px;text-align:center;">
+        <div style="font-size:10px;color:var(--text2);font-weight:700;text-transform:uppercase;">বকেয়া</div>
+        <div style="font-size:14px;font-weight:800;margin-top:4px;color:${bal>0?'var(--red)':bal<0?'var(--yellow)':'var(--green)'};">${fmt(Math.abs(bal))}</div>
+      </div>
+    </div>
+
+    <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">📊 পণ্যভিত্তিক সারসংক্ষেপ</div>
+    ${sumRows||'<div style="text-align:center;color:var(--text3);font-size:13px;padding:16px;">কোনো লেনদেন নেই</div>'}
+
+    ${txs.length?`<div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;margin-top:4px;">🕒 সাম্প্রতিক লেনদেন</div>
+    <div style="background:var(--surface2);border-radius:var(--r-sm);padding:0 12px;">${recentRows}</div>`:''}
+  `);
 }
 
 // ══ ACCOUNTING ══
@@ -1292,6 +1623,7 @@ function fabAct(){
   if(curPage==='transactions'){submitTx();return;}
   if(curPage==='products'){openAddProd();return;}
   if(curPage==='parties'){openAddPty();return;}
+  if(curPage==='clinic'){openAddClinicEntry();return;}
   showPage('transactions');
 }
 
