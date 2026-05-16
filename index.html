@@ -1154,9 +1154,12 @@ function renderParties(){
           <button class="ibt ibt-d" onclick="delPty('${p.id}')">🗑️</button>
         </div>
       </div>
-      <div style="border-top:1px solid var(--border);padding:8px 14px 12px;">
-        <button onclick="openPartyLedger('${p.id}')" style="width:100%;padding:9px;background:rgba(79,110,247,.1);border:1.5px solid rgba(79,110,247,.25);border-radius:var(--r-sm);font-size:12.5px;font-weight:700;color:var(--accent);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+      <div style="border-top:1px solid var(--border);padding:8px 14px 12px;display:flex;gap:8px;">
+        <button onclick="openPartyLedger('${p.id}')" style="flex:1;padding:9px;background:rgba(79,110,247,.1);border:1.5px solid rgba(79,110,247,.25);border-radius:var(--r-sm);font-size:12.5px;font-weight:700;color:var(--accent);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
           📦 মালের বিবরণ দেখুন
+        </button>
+        <button onclick="dlPartyStatementPDF('${p.id}')" style="flex:1;padding:9px;background:rgba(16,185,129,.1);border:1.5px solid rgba(16,185,129,.25);border-radius:var(--r-sm);font-size:12.5px;font-weight:700;color:var(--green);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+          📄 স্টেটমেন্ট PDF
         </button>
       </div>
     </div>`;
@@ -1243,6 +1246,10 @@ function openPartyLedger(partyId){
 
     ${txs.length?`<div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;margin-top:4px;">🕒 সাম্প্রতিক লেনদেন</div>
     <div style="background:var(--surface2);border-radius:var(--r-sm);padding:0 12px;">${recentRows}</div>`:''}
+
+    <button onclick="dlPartyStatementPDF('${partyId}')" style="width:100%;margin-top:16px;padding:13px;background:linear-gradient(135deg,#10b981,#06b6d4);border:none;border-radius:var(--r-sm);font-size:14px;font-weight:700;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
+      📄 স্টেটমেন্ট PDF ডাউনলোড করুন
+    </button>
   `);
 }
 
@@ -1973,6 +1980,110 @@ function dlAccountingPDF(){
     margin:{left:12,right:12}});
   doc.save(`stockflow-accounting-${today()}.pdf`);
   toast('হিসাব রিপোর্ট PDF ডাউনলোড হচ্ছে…','success');
+}
+
+function dlPartyStatementPDF(partyId){
+  const party=state.parties.find(p=>p.id===partyId);
+  if(!party){toast('পার্টি পাওয়া যায়নি','error');return;}
+  const {jsPDF}=window.jspdf;const doc=new jsPDF();
+  const txs=[...state.transactions.filter(t=>t.partyId===partyId)].sort((a,b)=>a.date.localeCompare(b.date)||a.timestamp-b.timestamp);
+  const payments=[...state.payments.filter(p=>p.partyId===partyId)].sort((a,b)=>a.date.localeCompare(b.date)||a.timestamp-b.timestamp);
+  const bal=calcPartyBalance(partyId);
+  const totalBusiness=txs.reduce((s,t)=>s+(Number(t.price)||0)*(Number(t.qty)||0),0);
+  const sup=party.type==='Supplier';
+
+  // Header
+  const hColor=sup?[6,182,212]:[124,58,237];
+  doc.setFillColor(...hColor);doc.rect(0,0,210,28,'F');
+  doc.setTextColor(255,255,255);doc.setFontSize(15);doc.setFont('helvetica','bold');
+  doc.text('StockFlow Pro - Party Statement',14,13);
+  doc.setFontSize(9);doc.setFont('helvetica','normal');
+  doc.text(`${sup?'Supplier':'Customer'}: ${party.name} | Contact: ${party.contact||'N/A'}`,14,22);
+
+  doc.setTextColor(60,60,60);doc.setFontSize(8.5);doc.setFont('helvetica','normal');
+  doc.text(`Generated: ${new Date().toLocaleString()} | Transactions: ${txs.length} | Total Business: BDT ${totalBusiness.toFixed(2)}`,14,36);
+  doc.text(`Balance: ${bal>0?'Due (Party owes us)':bal<0?'Owe (We owe party)':'Settled'}: BDT ${Math.abs(bal).toFixed(2)}`,14,43);
+
+  // Summary table by product
+  const summary={};
+  txs.forEach(t=>{
+    const key=t.productId+'_'+t.variantId;
+    if(!summary[key]) summary[key]={productId:t.productId,variantId:t.variantId,purchase:0,sales:0,returnIn:0,returnOut:0,purchaseAmt:0,salesAmt:0};
+    if(t.type==='PURCHASE'){summary[key].purchase+=Number(t.qty)||0;summary[key].purchaseAmt+=(Number(t.price)||0)*(Number(t.qty)||0);}
+    else if(t.type==='SALES'){summary[key].sales+=Number(t.qty)||0;summary[key].salesAmt+=(Number(t.price)||0)*(Number(t.qty)||0);}
+    else if(t.type==='RETURN_IN') summary[key].returnIn+=Number(t.qty)||0;
+    else if(t.type==='RETURN_OUT') summary[key].returnOut+=Number(t.qty)||0;
+  });
+  const sumRows=Object.values(summary).map(s=>{
+    const pr=state.products.find(p=>p.id===s.productId);
+    const vr=state.variants.find(v=>v.id===s.variantId);
+    const net=(s.purchase+s.returnIn)-(s.sales+s.returnOut);
+    return [pr?.name||'?',(vr?.size||'')+(vr?' ('+vr.unit+')':''),s.purchase||'-',s.sales||'-',s.returnIn||'-',s.returnOut||'-',net>0?'+'+net:net,s.purchaseAmt>0?s.purchaseAmt.toFixed(2):'-',s.salesAmt>0?s.salesAmt.toFixed(2):'-'];
+  });
+
+  if(sumRows.length){
+    doc.setFontSize(10);doc.setFont('helvetica','bold');doc.setTextColor(40,40,40);
+    doc.text('Product Summary',14,52);
+    doc.autoTable({startY:56,
+      head:[['Product','Variant','Purchase','Sales','Ret.In','Ret.Out','Net','Purch.Amt','Sales.Amt']],
+      body:sumRows,
+      styles:{fontSize:7,cellPadding:2},
+      headStyles:{fillColor:[30,30,50],textColor:255,fontStyle:'bold'},
+      alternateRowStyles:{fillColor:[245,248,255]},
+      columnStyles:{2:{halign:'right'},3:{halign:'right'},4:{halign:'right'},5:{halign:'right'},6:{halign:'right'},7:{halign:'right'},8:{halign:'right'}},
+      margin:{left:10,right:10}});
+  }
+
+  // Transaction detail table
+  const txRows=txs.map(t=>{
+    const pr=state.products.find(p=>p.id===t.productId);
+    const vr=state.variants.find(v=>v.id===t.variantId);
+    const total=(Number(t.price)||0)*(Number(t.qty)||0);
+    return [t.date,t.type.replace('_',' '),pr?.name||'?',(vr?.size||'')+(vr?' ('+vr.unit+')':''),t.qty,t.price||'-',total>0?total.toFixed(2):'-',t.note||''];
+  });
+
+  const afterSumY=doc.lastAutoTable?doc.lastAutoTable.finalY+8:60;
+  if(txRows.length){
+    doc.setFontSize(10);doc.setFont('helvetica','bold');doc.setTextColor(40,40,40);
+    doc.text('Transaction Details',14,afterSumY);
+    doc.autoTable({startY:afterSumY+4,
+      head:[['Date','Type','Product','Variant','Qty','Price','Amount','Note']],
+      body:txRows,
+      styles:{fontSize:7,cellPadding:2.2},
+      headStyles:{fillColor:hColor,textColor:255,fontStyle:'bold'},
+      alternateRowStyles:{fillColor:[248,250,255]},
+      columnStyles:{4:{halign:'right'},5:{halign:'right'},6:{halign:'right'}},
+      margin:{left:10,right:10}});
+  }
+
+  // Payments table
+  if(payments.length){
+    const payRows=payments.map(p=>([p.date,p.direction==='received'?'Received':'Paid',p.amount.toFixed(2),p.note||'']));
+    const afterTxY=doc.lastAutoTable?doc.lastAutoTable.finalY+8:afterSumY+10;
+    doc.setFontSize(10);doc.setFont('helvetica','bold');doc.setTextColor(40,40,40);
+    doc.text('Payment Records',14,afterTxY);
+    doc.autoTable({startY:afterTxY+4,
+      head:[['Date','Direction','Amount (BDT)','Note']],
+      body:payRows,
+      styles:{fontSize:7.5,cellPadding:2.5},
+      headStyles:{fillColor:[16,185,129],textColor:255,fontStyle:'bold'},
+      alternateRowStyles:{fillColor:[240,255,248]},
+      columnStyles:{2:{halign:'right'}},
+      margin:{left:10,right:10}});
+  }
+
+  // Balance footer
+  const finalY=doc.lastAutoTable?doc.lastAutoTable.finalY+12:afterSumY+20;
+  if(finalY<270){
+    doc.setFillColor(245,247,255);doc.rect(10,finalY,190,18,'F');
+    doc.setFontSize(10);doc.setFont('helvetica','bold');
+    doc.setTextColor(bal>0?220:bal<0?180:20,bal>0?38:bal<0?130:150,bal>0?38:bal<0?0:80);
+    const balLabel=bal>0?`Due (Party owes): BDT ${bal.toFixed(2)}`:bal<0?`Owe (We owe): BDT ${(-bal).toFixed(2)}`:'Balance: Settled ✓';
+    doc.text(`Final Balance — ${balLabel}`,14,finalY+11);
+  }
+
+  doc.save(`party-statement-${party.name.replace(/\s+/g,'-')}-${today()}.pdf`);
+  toast(`${party.name} স্টেটমেন্ট ডাউনলোড হচ্ছে… 📄`,'success');
 }
 
 // ══ TOAST ══
